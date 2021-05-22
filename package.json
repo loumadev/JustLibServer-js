@@ -10,6 +10,6 @@
 	"author": "Jaroslav Louma",
 	"homepage": "https://github.com/loumadev/JustLibServer-js#readme",
 	"dependencies": {
-		"justlib-js": "git://github.com/loumadev/justlib-js.git"
+		"justlib-js": "https://github.com/loumadev/JustLib-js.git"
 	}
 }
