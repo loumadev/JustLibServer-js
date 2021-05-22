@@ -1,0 +1,15 @@
+{
+	"name": "justlibserver-js",
+	"version": "0.0.1",
+	"description": "JustLibServer.js Framework",
+	"main": "server.js",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/loumadev/JustLibServer-js.git"
+	},
+	"author": "Jaroslav Louma",
+	"homepage": "https://github.com/loumadev/JustLibServer-js#readme",
+	"dependencies": {
+		"justlib-js": "loumadev/justlib-js"
+	}
+}
