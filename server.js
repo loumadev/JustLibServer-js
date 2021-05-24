@@ -30,7 +30,7 @@ class Server extends EventListenerStatic {
 	/**
 	 * Server standard input/output
 	 * @static
-	 * @type {{cli: CLI, settings: {logs: Boolean, warnings: Boolean, errors: Boolean}}} obj1
+	 * @type {{cli: CLI, settings: {logs: boolean, warnings: boolean, errors: boolean}}} obj1
 	 * @memberof Server
 	 */
 	static stdio = {
@@ -172,8 +172,8 @@ class Server extends EventListenerStatic {
 		}
 
 		//Request handling
-		var destinationPath = redirectTo || URL.pathname;
-		var EventObject = new /*this.*/RequestEvent({
+		let destinationPath = redirectTo || URL.pathname;
+		const EventObject = new /*this.*/RequestEvent({
 			req,
 			res,
 			method: req.method,
@@ -193,7 +193,8 @@ class Server extends EventListenerStatic {
 		});
 
 		//Fix destination path ending with "/"
-		if(destinationPath.length > 1 && destinationPath.endsWith("/")) destinationPath = destinationPath.slice(0, -1);
+		//if(destinationPath.length > 1 && destinationPath.endsWith("/")) destinationPath = destinationPath.slice(0, -1);
+		if(destinationPath.length > 1 && destinationPath.endsWith("/")) EventObject.redirectURL(destinationPath.slice(0, -1), this.STATUS.REDIRECT.MOVED_PERMANENTLY);
 
 		//Dispatch events
 		this.dispatchEvent("request", EventObject);
@@ -453,65 +454,65 @@ class RequestEvent extends EventListener.Event {
 		this.res;
 
 		/**
-		 * @type {String} Request method
+		 * @type {string} Request method
 		 */
 		this.method;
 
 		/**
-		 * @type {String} Remote IP address
+		 * @type {string} Remote IP address
 		 */
 		this.RemoteIP;
 
 		/**
-		 * @type {String} Forwarded IP address
+		 * @type {string} Forwarded IP address
 		 */
 		this.ProxyIP;
 
 		/**
-		 * @type {String} IP address of the client
+		 * @type {string} IP address of the client
 		 */
 		this.IP;
 
 		/**
-		 * @type {String} Request host
+		 * @type {string} Request host
 		 */
 		this.host;
 
 		/**
 		 * @deprecated Use 'host' instead
-		 * @type {String} Request host
+		 * @type {string} Request host
 		 */
 		this.HOST;
 
 		/**
-		 * @type {String} Request origin
+		 * @type {string} Request origin
 		 * @example "https://www.example.com"
 		 */
 		this.origin;
 
 		/**
-		 * @type {String} Request destination path
+		 * @type {string} Request destination path
 		 */
 		this.path;
 
 		/**
 		 * @deprecated Use 'path' instead
-		 * @type {String} Request destination path
+		 * @type {string} Request destination path
 		 */
 		this.Path;
 
 		/**
-		 * @type {Object} Request query string parameters object
+		 * @type {Object<string, any>} Request query string parameters object
 		 */
 		this.query;
 
 		/**
-		 * @type {Boolean} Tells if the request comes from trusted origin
+		 * @type {boolean} Tells if the request comes from trusted origin
 		 */
 		this.IS_TRUSTED;
 
 		/**
-		 * @type {Boolean} Enables auto prevent when calling methods 'get', 'post', 'send', 'sendFile', 'streamFile'...
+		 * @type {boolean} Enables auto prevent when calling methods 'get', 'post', 'send', 'sendFile', 'streamFile'...
 		 */
 		this.autoPrevent;
 
@@ -523,8 +524,8 @@ class RequestEvent extends EventListener.Event {
 
 	/**
 	 * Handles GET method
-	 * @param {function(Object<String, any>): void} callback Request callback function
-	 * @return {Boolean} True if request was successfully handled, otherwise false
+	 * @param {(query: Object<string, any>) => void} callback Request callback function
+	 * @return {boolean} True if request was successfully handled, otherwise false
 	 * @memberof RequestEvent
 	 */
 	get(callback) {
@@ -540,9 +541,9 @@ class RequestEvent extends EventListener.Event {
 
 	/**
 	 * Handles POST method
-	 * @param {function(String|Object<String, any>, Buffer): void} callback Request callback function
-	 * @param {"text"|"json"|"form"} [type="text"] Request body type (Default: "text")
-	 * @return {Boolean} True if request was successfully handled, otherwise false
+	 * @param {(bodyParsed: string | Object<string, any>, bodyBuffer: Buffer) => void} callback Request callback function
+	 * @param {"text" | "json" | "form"} [type="text"] Request body type (Default: "text")
+	 * @return {boolean} True if request was successfully handled, otherwise false
 	 * @memberof RequestEvent
 	 */
 	post(callback, type = "text") {
@@ -577,7 +578,7 @@ class RequestEvent extends EventListener.Event {
 	 * @example Server.on("/home", e => {
 	 * e.redirect("/home.html");
 	 * });
-	 * @param {String} destination
+	 * @param {string} destination
 	 * @memberof RequestEvent
 	 */
 	redirect(destination) {
@@ -587,6 +588,27 @@ class RequestEvent extends EventListener.Event {
 		this.stopPropagation();
 
 		Server._handleRequest(this.req, this.res, destination);
+	};
+
+	/**
+	 * Redirects destination path to another local path
+	 * @example Server.on("/instagram", e => {
+	 * e.redirect("https://www.instagram.com/example");
+	 * });
+	 * @example Server.on("/dashboard", e => {
+	 * e.redirect("/login");  //This will get converted to absolute path internally
+	 * });
+	 * @param {string} destination
+	 * @memberof RequestEvent
+	 */
+	redirectURL(destination, status = 307) {
+		if(typeof destination !== "string") throw new TypeError("'destination' parameter is not type of string");
+
+		if(destination.startsWith("/")) destination = this.origin + destination;
+
+		this.preventDefault();
+		this.res.writeHead(status, {"Location": destination});
+		this.res.end();
 	};
 
 	/**
@@ -638,9 +660,9 @@ class RequestEvent extends EventListener.Event {
 
 	/**
 	 * Send response (shorthand for 'Send')
-	 * @param {String|Object<String, any>|Buffer|ReadableStream} data Data to be sent as response
-	 * @param {Number} [status=200] Response status code
-	 * @param {String|"text/plain"|"text/html"|"application/json"|"image/png"|"audio/mpeg"|"video/mp4"} [contentType="text/plain"] Content type of the response
+	 * @param {string | Object<string, any> | Buffer | ReadableStream} data Data to be sent as response
+	 * @param {number} [status=200] Response status code
+	 * @param {string | "text/plain" | "text/html" | "application/json" | "image/png" | "audio/mpeg" | "video/mp4"} [contentType="text/plain"] Content type of the response
 	 * @param {http.OutgoingHttpHeaders} [headers={}] Response headers
 	 */
 	send(data, status = 200, contentType = "text/plain", headers = {}) {
@@ -652,7 +674,14 @@ class RequestEvent extends EventListener.Event {
 		Server._connectionLog(status);
 	};
 
-	//Stream file buffer
+	/**
+	 * Stream file buffer
+	 * @param {string} filePath
+	 * @param {number} [status=200]
+	 * @param {http.OutgoingHttpHeaders} [headers={}]
+	 * @return {boolean} 
+	 * @memberof RequestEvent
+	 */
 	async sendFile(filePath, status = 200, headers = {}) {
 		this.preventDefault();
 		if(this.res.writableEnded) return Server.warn(`Failed to write response after end. ('e.send()'/'e.streamFile()' might be called multiple times)`);
@@ -672,7 +701,13 @@ class RequestEvent extends EventListener.Event {
 		return true;
 	};
 
-	//Stream file using parial content response
+	/**
+	 * Stream file using parial content response
+	 * @param {string} filePath
+	 * @param {http.OutgoingHttpHeaders} [headers={}]
+	 * @return {boolean} 
+	 * @memberof RequestEvent
+	 */
 	async streamFile(filePath, headers = {}) {
 		this.preventDefault();
 		if(this.res.writableEnded) return Server.warn(`Failed to write response after end. ('e.send()'/'e.streamFile()' might be called multiple times)`), false;
@@ -963,200 +998,6 @@ CookieJar.Cookie = class Cookie {
 		});
 	}
 };
-
-
-// class CLI extends EventListener {
-// 	constructor({stdin, stdout, stderr}) {
-// 		super();
-
-// 		/**
-// 		 * @type {
-// 				((event: 'command', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
-// 				((event: 'input', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
-// 				((event: 'stdout', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
-// 				((event: 'stderr', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
-// 				((event: 'stderr', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
-// 				((event: 'unknownCommand', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
-// 				((event: 'keypress', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
-// 				((event: 'load', listener: (event: EventListener.Event) => void) => EventListener.Listener)
-// 			}
-// 		*/
-// 		this.on;
-
-// 		this.stdin = stdin;
-// 		this.stdout = stdout;
-// 		this.stderr = stderr;
-
-// 		this.isResumed = false;
-// 		this.buffer = "";
-// 		this.current = "";
-// 		this.cursor = 0;
-// 		this.history = [];
-// 		this.pointer = 0;
-// 	}
-
-// 	begin() {
-// 		//Setup stdin
-// 		this.stdin.setRawMode(true);
-// 		this.stdin.setEncoding("utf8");
-// 		this.stdin.on("data", key => this._keyPressed(key, this.stdout));
-
-// 		//Setup stdout
-// 		this.stdout.setEncoding("utf8");
-// 		this.stdout.__write = this.stdout.write;
-// 		this.stdout.write = (string, encoding, fd) => {
-// 			this.dispatchEvent("stdout", {data: string, string: this._unescape(string)});
-// 			this.stdout.__write.apply(this.stdout, [(this.isResumed ? "\r\x1b[K" : "") + string, encoding, fd]);
-// 			this._updateCLI();
-// 		};
-
-// 		//Setup stderr
-// 		this.stderr.setEncoding("utf8");
-// 		this.stderr.__write = this.stderr.write;
-// 		this.stderr.write = (string, encoding, fd) => {
-// 			this.dispatchEvent("stderr", {data: string, string: this._unescape(string)});
-// 			this.stderr.__write.apply(this.stderr, [(this.isResumed ? "\r\x1b[K" : "") + string, encoding, fd]);
-// 			this._updateCLI();
-// 		};
-
-// 		//Begin
-// 		this.stdout.write("> ");
-// 		this.resume();
-
-// 		this.dispatchEvent("load");
-// 	}
-
-// 	pause() {
-// 		this.isResumed = false;
-// 		this.stdin.pause();
-// 	}
-
-// 	resume() {
-// 		this.isResumed = true;
-// 		this.stdin.resume();
-// 	}
-
-// 	_updateCLI() {
-// 		var offset = this.buffer.length - this.cursor;
-// 		this.stdout.__write.apply(this.stdout, ["\r\x1b[K" + "> " + this.buffer + (offset ? "\x1b[" + offset + "D" : "")]);
-// 	}
-
-// 	_unescape(string) {
-// 		return string.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
-// 	}
-
-// 	_keyPressed(key, stream = this.stdout) {
-// 		if(key == KEY.ARROW_UP) {
-// 			if(this.pointer == this.history.length) this.current = this.buffer;
-// 			if(this.pointer) {
-// 				this.buffer = this.history[--this.pointer];
-// 				this.cursor = this.buffer.length;
-
-// 				this._updateCLI();
-// 			}
-// 		}
-// 		else if(key == KEY.ARROW_DOWN) {
-// 			if(this.pointer < this.history.length) {
-// 				this.buffer = this.history[++this.pointer] || this.current;
-// 				this.cursor = this.buffer.length;
-
-// 				this._updateCLI();
-// 			}
-// 		}
-// 		else if(key == KEY.ARROW_LEFT) {
-// 			this.cursor--;
-// 			if(this.cursor < 0) this.cursor = 0;
-// 			else stream.__write.apply(stream, [key]);
-// 		}
-// 		else if(key == KEY.ARROW_RIGHT) {
-// 			this.cursor++;
-// 			if(this.cursor > this.buffer.length) this.cursor = this.buffer.length;
-// 			else stream.__write.apply(stream, [key]);
-// 		}
-// 		else if(key == KEY.CTRL_ARROW_LEFT) {
-// 			var jumps = [...this.buffer.matchAll(/\b/g)].map(e => e.index).reverse();
-// 			var index = jumps.find(e => e < this.cursor && this.cursor - e != 1) || 0;
-
-// 			this.cursor = index;
-// 			this._updateCLI();
-// 		}
-// 		else if(key == KEY.CTRL_ARROW_RIGHT) {
-// 			var jumps = [...this.buffer.matchAll(/\b/g)].map(e => e.index);
-// 			var index = jumps.find(e => e > this.cursor && e - this.cursor != 1) || this.buffer.length;
-
-// 			this.cursor = index;
-// 			this._updateCLI();
-// 		}
-// 		else if(key == KEY.BACKSPACE) {
-// 			this.cursor--; if(this.cursor < 0) return this.cursor = 0;
-// 			this.buffer = this.buffer.substring(0, this.cursor) + this.buffer.substring(this.cursor + 1);
-
-// 			this._updateCLI();
-// 		}
-// 		else if(key == KEY.DELETE) {
-// 			this.buffer = this.buffer.substring(0, this.cursor) + this.buffer.substring(this.cursor + 1);
-
-// 			this._updateCLI();
-// 		}
-// 		else if(key == KEY.CTRL_BACKSPACE) {
-// 			var jumps = [...this.buffer.matchAll(/\b/g)].map(e => e.index).reverse();
-// 			var index = jumps.find(e => e < this.cursor && this.cursor - e != 1) || 0;
-
-// 			this.buffer = this.buffer.substring(0, index) + this.buffer.substring(this.cursor + 1);
-// 			this.cursor = index;
-
-// 			this._updateCLI();
-// 		}
-// 		else if(key == KEY.CTRL_DELETE) {
-// 			var jumps = [...this.buffer.matchAll(/\b/g)].map(e => e.index);
-// 			var index = jumps.find(e => e > this.cursor && e - this.cursor != 1) || this.buffer.length;
-
-// 			this.buffer = this.buffer.substring(0, this.cursor) + this.buffer.substring(index + 1);
-
-// 			this._updateCLI();
-// 		}
-// 		else if(key == KEY.RETURN) {
-// 			if(this.buffer && this.buffer != this.history[this.history.length - 1]) this.pointer = this.history.push(this.buffer);
-// 			else this.pointer = this.history.length;
-
-// 			var input = this.buffer;
-// 			var args = input.trim().split(" ");
-// 			var command = args.shift();
-
-// 			this.buffer = "";
-// 			this.cursor = 0;
-
-// 			this.dispatchEvent("stdout", {data: ("> " + input + "\n"), string: this._unescape("> " + input + "\n")});
-// 			stream.__write.apply(stream, ["\n> "]);
-// 			this.dispatchEvent("command", {input, command, args}, event => {
-// 				this.dispatchEvent("unknownCommand", event);
-// 			});
-// 			this.dispatchEvent("input", {input});
-// 		} else {
-// 			this.buffer = this.buffer.substring(0, this.cursor) + key + this.buffer.substring(this.cursor);
-// 			this.cursor++;
-
-// 			this._updateCLI();
-// 		}
-
-// 		this.dispatchEvent("keypress");
-// 	}
-// }
-
-// const KEY = {
-// 	RETURN: "\015",
-// 	BACKSPACE: "\010",
-// 	CTRL_BACKSPACE: "\177",
-// 	DELETE: "\x1b[3~",
-// 	CTRL_DELETE: "\x1b[3;5~",
-// 	ARROW_UP: "\x1b[A",
-// 	ARROW_DOWN: "\x1b[B",
-// 	ARROW_LEFT: "\x1b[D",
-// 	CTRL_ARROW_LEFT: "\x1b[1;5D",
-// 	ARROW_RIGHT: "\x1b[C",
-// 	CTRL_ARROW_RIGHT: "\x1b[1;5C",
-// };
-// exports.KEY = KEY;
 
 const DEFAULT_CONFIG = {
 	"http-port": 80,
