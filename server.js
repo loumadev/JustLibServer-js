@@ -116,17 +116,19 @@ class Server extends EventListenerStatic {
 		//Init
 		if(!this.title) this.setTitle();
 
-		//HTTP Server
-		this.log("§7Creating HTTP server...");
-		if(!fs.existsSync(PATH.PUBLIC)) {
-			this.log(`§7Creating new empty §fpublic §7folder...`);
-			fs.mkdirSync(PATH.PUBLIC);
-		}
-		this.http = http.createServer((req, res) => this._handleRequest(req, res));
-		this.http.on("error", err => {
-			this.error(err.message);
-		});
-		this.log(`§7HTTP server created`);
+		//HTTP listen
+		if(this.config["enable-http-server"]) {
+			this.log("§7Creating HTTP server...");
+			if(!fs.existsSync(PATH.PUBLIC)) {
+				this.log(`§7Creating new empty §fpublic §7folder...`);
+				fs.mkdirSync(PATH.PUBLIC);
+			}
+			this.http = http.createServer((req, res) => this._handleRequest(req, res));
+			this.http.on("error", err => {
+				this.error(err.message);
+			});
+			this.log(`§7HTTP server created`);
+		} else this.log(`§6HTTP server is disabled!`);
 
 		//Modules
 		this._loadModules();
@@ -137,11 +139,13 @@ class Server extends EventListenerStatic {
 		this.log("§7Server loaded");
 
 		//HTTP listen
-		this.http.listen(this.config["http-port"]);
-		this.http.on("listening", e => {
-			this.log("§7Server listen on port §f" + this.config["http-port"]);
-			this.log(`§7Initialisation done (§ftook ${new Date() - startDate}ms§7)`);
-		});
+		if(this.config["enable-http-server"]) {
+			this.http.listen(this.config["http-port"]);
+			this.http.on("listening", e => {
+				this.log("§7Server listen on port §f" + this.config["http-port"]);
+				this.log(`§7Initialisation done (§ftook ${new Date() - startDate}ms§7)`);
+			});
+		} else this.log(`§7Initialisation done (§ftook ${new Date() - startDate}ms§7)`);
 	}
 
 	static stop(code = 0) {
@@ -1005,6 +1009,7 @@ CookieJar.Cookie = class Cookie {
 
 const DEFAULT_CONFIG = {
 	"http-port": 80,
+	"enable-http-server": true,
 	"enable-cli": true,
 	"debug": true,
 	"login": {
