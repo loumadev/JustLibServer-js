@@ -382,10 +382,11 @@ class Server extends EventListenerStatic {
 
 	static formatMessage(msg) {
 		var codes = ["30", "34", "32", "36", "31", "35", "33", "37", "90", "94", "92", "96", "91", "95", "93", "97"];
-		var message = msg + "§r§7".replace(/§r/g, "\x1b[0m");
-		//tmessage = message.replace(/§n/g, "\x1b[4m");
+		var message = (msg + "§r§7").replace(/§r/g, "\x1b[0m");
+
 		var arr = message.split("§");
 		var formatted = arr[0];
+
 		if(arr.length > 1) {
 			arr.shift();
 			for(var i = 0; i < arr.length; i++) {
@@ -396,6 +397,7 @@ class Server extends EventListenerStatic {
 		} else {
 			return message;
 		}
+
 		return formatted;
 	}
 
