@@ -1,9 +1,8 @@
-
-const http = require('http');
-const path = require('path');
+const http = require("http");
+const path = require("path");
 const util = require("util");
-const url = require('url');
-const fs = require('fs');
+const url = require("url");
+const fs = require("fs");
 const {EventListenerStatic, EventListener, fixDigits, iterate, getQueryParameters} = require("./JustLib.js");
 const {CLI, KEY} = require("./CLI");
 
@@ -57,9 +56,8 @@ class Server extends EventListenerStatic {
 		 */
 		this.on;
 
-
 		//Set up error logging
-		process.on('unhandledRejection', (reason, promise) => {
+		process.on("unhandledRejection", (reason, promise) => {
 			this.error("Unhandled Promise Rejection at:", promise);
 		});
 
@@ -97,7 +95,7 @@ class Server extends EventListenerStatic {
 						this.log(`[EVAL ERROR]: ` + (e?.message || `Unknown error (${e?.message})`));
 					}
 				} else if(command == "") {
-					;
+
 				} else return;
 
 				e.preventDefault();
@@ -179,7 +177,6 @@ class Server extends EventListenerStatic {
 			method: req.method,
 			RemoteIP,
 			ProxyIP,
-			ProxyIP,
 			IP,
 			host: (HOST || ""),
 			HOST: (HOST || ""), /* Deprecated */
@@ -193,8 +190,8 @@ class Server extends EventListenerStatic {
 		});
 
 		//Fix destination path ending with "/"
-		//if(destinationPath.length > 1 && destinationPath.endsWith("/")) destinationPath = destinationPath.slice(0, -1);
-		if(destinationPath.length > 1 && destinationPath.endsWith("/")) EventObject.redirectURL(destinationPath.slice(0, -1), this.STATUS.REDIRECT.MOVED_PERMANENTLY);
+		if(destinationPath.length > 1 && destinationPath.endsWith("/")) destinationPath = destinationPath.slice(0, -1);
+		//if(destinationPath.length > 1 && destinationPath.endsWith("/")) EventObject.redirectURL(destinationPath.slice(0, -1), this.STATUS.REDIRECT.MOVED_PERMANENTLY);
 
 		//Dispatch events
 		this.dispatchEvent("request", EventObject);
@@ -326,7 +323,7 @@ class Server extends EventListenerStatic {
 		const files = getAllFiles(PATH.MODULES, 1);
 		for(var file of files) {
 			let project = path.basename(path.dirname(file)); if(project == dirname) project = null;
-			let filename = path.basename(file);
+			const filename = path.basename(file);
 			const moduleName = (project ? project + "/" : "") + filename;
 
 			//Skip not '*.js' files
@@ -522,10 +519,11 @@ class RequestEvent extends EventListener.Event {
 		this.matches;
 	}
 
+	// eslint-disable-next-line valid-jsdoc
 	/**
 	 * Handles GET method
 	 * @param {(query: Object<string, any>) => void} callback Request callback function
-	 * @return {boolean} True if request was successfully handled, otherwise false
+	 * @returns {boolean} True if request was successfully handled, otherwise false
 	 * @memberof RequestEvent
 	 */
 	get(callback) {
@@ -537,13 +535,14 @@ class RequestEvent extends EventListener.Event {
 			callback(this.query);
 			return true;
 		} else return false;
-	};
+	}
 
+	// eslint-disable-next-line valid-jsdoc
 	/**
 	 * Handles POST method
 	 * @param {(bodyParsed: string | Object<string, any>, bodyBuffer: Buffer) => void} callback Request callback function
 	 * @param {"text" | "json" | "form"} [type="text"] Request body type (Default: "text")
-	 * @return {boolean} True if request was successfully handled, otherwise false
+	 * @returns {boolean} True if request was successfully handled, otherwise false
 	 * @memberof RequestEvent
 	 */
 	post(callback, type = "text") {
@@ -571,7 +570,7 @@ class RequestEvent extends EventListener.Event {
 			});
 			return true;
 		} else return false;
-	};
+	}
 
 	/**
 	 * Redirects destination path to another local path
@@ -588,7 +587,7 @@ class RequestEvent extends EventListener.Event {
 		this.stopPropagation();
 
 		Server._handleRequest(this.req, this.res, destination);
-	};
+	}
 
 	/**
 	 * Redirects destination path to another local path
@@ -599,6 +598,7 @@ class RequestEvent extends EventListener.Event {
 	 * e.redirect("/login");  //This will get converted to absolute path internally
 	 * });
 	 * @param {string} destination
+	 * @param {number} [status=307]
 	 * @memberof RequestEvent
 	 */
 	redirectURL(destination, status = 307) {
@@ -609,14 +609,15 @@ class RequestEvent extends EventListener.Event {
 		this.preventDefault();
 		this.res.writeHead(status, {"Location": destination});
 		this.res.end();
-	};
+	}
 
+	// eslint-disable-next-line valid-jsdoc
 	/**
 	 * Authentication
 	 * @param {(credentials: Credentials) => any} callback
 	 * @param {string} [realm="realm"]
 	 * @param {Credentials} [credentials=Server.config.login]
-	 * @return {boolean} 
+	 * @returns {boolean} 
 	 * @memberof RequestEvent
 	 */
 	auth(callback = null, realm = "realm", credentials = Server.config.login) {
@@ -629,7 +630,7 @@ class RequestEvent extends EventListener.Event {
 		if(typeof callback !== "function") throw new TypeError(`Callback '${callback}' is not type of function or null`);
 
 		//No auth header
-		if(!auth && (!basic || !bearer)) return this.send("", 401, "text/html", {'www-authenticate': `Basic realm="${realm}"`}), false;
+		if(!auth && (!basic || !bearer)) return this.send("", 401, "text/html", {"www-authenticate": `Basic realm="${realm}"`}), false;
 
 		//Bearer auth
 		if(typeof credentials.token !== "undefined") {
@@ -656,7 +657,7 @@ class RequestEvent extends EventListener.Event {
 		//Unsupported auth
 		this.send("500 Cannot process provided authentication type", 500);
 		throw new TypeError("Invalid credentials / unsupported authentication type", credentials);
-	};
+	}
 
 	/**
 	 * Send response (shorthand for 'Send')
@@ -667,19 +668,20 @@ class RequestEvent extends EventListener.Event {
 	 */
 	send(data, status = 200, contentType = "text/plain", headers = {}) {
 		this.preventDefault();
-		if(this.res.writableEnded) return Server.warn(`Failed to write response after end. ('e.send()'/'e.streamFile()' might be called multiple times)`);
 
-		//Send data
-		Send(this.res, data, status, contentType, headers);
-		Server._connectionLog(status);
-	};
+		if(!this.res.writableEnded) {
+			//Send data
+			Send(this.res, data, status, contentType, headers);
+			Server._connectionLog(status);
+		} else Server.warn(`Failed to write response after end. ('e.send()'/'e.streamFile()' might be called multiple times)`);
+	}
 
 	/**
 	 * Stream file buffer
 	 * @param {string} filePath
 	 * @param {number} [status=200]
 	 * @param {http.OutgoingHttpHeaders} [headers={}]
-	 * @return {boolean} 
+	 * @returns {boolean} 
 	 * @memberof RequestEvent
 	 */
 	async sendFile(filePath, status = 200, headers = {}) {
@@ -699,13 +701,13 @@ class RequestEvent extends EventListener.Event {
 		Send(this.res, fs.createReadStream(filePath), status, getContentType(filePath), headers);
 		Server._connectionLog(status);
 		return true;
-	};
+	}
 
 	/**
 	 * Stream file using parial content response
 	 * @param {string} filePath
 	 * @param {http.OutgoingHttpHeaders} [headers={}]
-	 * @return {boolean} 
+	 * @returns {boolean} 
 	 * @memberof RequestEvent
 	 */
 	async streamFile(filePath, headers = {}) {
@@ -740,7 +742,7 @@ class RequestEvent extends EventListener.Event {
 		}
 		Server._connectionLog(status);
 		return true;
-	};
+	}
 }
 
 
@@ -759,7 +761,7 @@ class CookieJar {
 	 * @param {string|CookieJar.Cookie|http.ServerResponse} cookie Cookie name (requires second parameter), Cookie String, CookieJar.Cookie object, ServerResponseLike object
 	 * @param {string} [value=undefined]
 	 * @param {Object<string,any>} [options={}]
-	 * @return {CookieJar} 
+	 * @returns {CookieJar} 
 	 * @memberof CookieJar
 	 */
 	setCookie(cookie, value = undefined, options = {}) {
@@ -825,7 +827,7 @@ class CookieJar {
 	/**
 	 * Retrns cookie object found by name
 	 * @param {string} name Cookie name
-	 * @return {CookieJar.Cookie} Cookie object if found, otherwise undefined
+	 * @returns {CookieJar.Cookie} Cookie object if found, otherwise undefined
 	 * @memberof CookieJar
 	 */
 	getCookie(name) {
@@ -836,7 +838,7 @@ class CookieJar {
 	/**
 	 * Removes cookie from the Jar
 	 * @param {string|CookieJar.Cookie} cookie
-	 * @return {CookieJar.Cookie} Deleted cookie
+	 * @returns {CookieJar.Cookie} Deleted cookie
 	 * @memberof CookieJar
 	 */
 	deleteCookie(cookie) {
@@ -855,7 +857,7 @@ class CookieJar {
 	 * Sends header with cookies
 	 * @param {http.ServerResponse} response Server response object
 	 * @param {boolean} [full=true] Include cookie properties and flags
-	 * @return {CookieJar.Cookie} 
+	 * @returns {CookieJar.Cookie} 
 	 * @memberof CookieJar
 	 */
 	sendCookies(response, full = true) {
@@ -867,7 +869,7 @@ class CookieJar {
 	/**
 	 * Converts Cookie object to cookie string 
 	 * @param {boolean} [full=true] Include cookie properties and flags
-	 * @return {string} Cookie String
+	 * @returns {string} Cookie String
 	 * @memberof CookieJar
 	 */
 	toString(full = true) {
@@ -877,7 +879,7 @@ class CookieJar {
 
 	/**
 	 * Checks if the Jar is empty
-	 * @return {boolean} true if Jar is empty, otherwise false
+	 * @returns {boolean} true if Jar is empty, otherwise false
 	 * @memberof CookieJar
 	 */
 	isEmpty() {
@@ -888,7 +890,7 @@ class CookieJar {
 	/**
 	 * Checks if the Jar contains cookie with certain name
 	 * @param {string} name Cookie name
-	 * @return {boolean} true if Jar contians cookie with certain name, otherwise false
+	 * @returns {boolean} true if Jar contians cookie with certain name, otherwise false
 	 * @memberof CookieJar
 	 */
 	includes(name) {
@@ -951,7 +953,7 @@ CookieJar.Cookie = class Cookie {
 	/**
 	 * Convert cookie to cookie string
 	 * @param {boolean} [full=true] Include cookie properties and flags
-	 * @return {string} Cookie String
+	 * @returns {string} Cookie String
 	 */
 	toString(full = true) {
 		var head = `${this.name}=${this.value}; `;
@@ -1133,67 +1135,67 @@ Server.on("/request", e => {
 });`;
 
 const CONTENT_TYPES = {
-	".aac": "audio/aac",
-	".avi": "video/x-msvideo",
-	".bin": "application/octet-stream",
-	".bmp": "image/bmp",
-	".bz": "application/x-bzip",
-	".bz2": "application/x-bzip2",
-	".csh": "application/x-csh",
-	".css": "text/css",
-	".csv": "text/csv",
-	".doc": "application/msword",
-	".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-	".eot": "application/vnd.ms-fontobject",
-	".gz": "application/gzip",
-	".gif": "image/gif",
-	".html": "text/html",
-	".htm": "text/html",
-	".ico": "image/vnd.microsoft.icon",
-	".ics": "text/calendar",
-	".jar": "application/java-archive",
-	".jpg": "image/jpeg",
-	".jpeg": "image/jpeg",
-	".js": "text/javascript",
-	".json": "application/json",
-	".mid": "audio/midi",
-	".midi": "audio/midi",
-	".mjs": "text/javascript",
-	".mp3": "audio/mpeg",
-	".mp4": "video/mp4",
-	".mpeg": "video/mpeg",
-	".mpkg": "application/vnd.apple.installer+xml",
-	".oga": "audio/ogg",
-	".ogv": "video/ogg",
-	".ogx": "application/ogg",
-	".otf": "font/otf",
-	".png": "image/png",
-	".pdf": "application/pdf",
-	".php": "application/x-httpd-php",
-	".ppt": "application/vnd.ms-powerpoint",
-	".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-	".rar": "application/vnd.rar",
-	".rtf": "application/rtf",
-	".sh": "application/x-sh",
-	".svg": "image/svg+xml",
-	".tar": "application/x-tar",
-	".tif": "image/tiff",
-	".tiff": "image/tiff",
-	".ts": "video/mp2t",
-	".ttf": "font/ttf",
-	".txt": "text/plain",
-	".wav": "audio/wav",
-	".webm": "audio/webm",
-	".weba": "video/webm",
-	".webp": "image/webp",
-	".woff": "font/woff",
-	".woff2": "font/woff2",
-	".xhtml": "application/xhtml+xml",
-	".xls": "application/vnd.ms-excel",
-	".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-	".xml": "application/xml",
-	".zip": "application/zip",
-	".7z": "application/x-7z-compressed"
+	"aac": "audio/aac",
+	"avi": "video/x-msvideo",
+	"bin": "application/octet-stream",
+	"bmp": "image/bmp",
+	"bz": "application/x-bzip",
+	"bz2": "application/x-bzip2",
+	"csh": "application/x-csh",
+	"css": "text/css",
+	"csv": "text/csv",
+	"doc": "application/msword",
+	"docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+	"eot": "application/vnd.ms-fontobject",
+	"gz": "application/gzip",
+	"gif": "image/gif",
+	"html": "text/html",
+	"htm": "text/html",
+	"ico": "image/vnd.microsoft.icon",
+	"ics": "text/calendar",
+	"jar": "application/java-archive",
+	"jpg": "image/jpeg",
+	"jpeg": "image/jpeg",
+	"js": "text/javascript",
+	"json": "application/json",
+	"mid": "audio/midi",
+	"midi": "audio/midi",
+	"mjs": "text/javascript",
+	"mp3": "audio/mpeg",
+	"mp4": "video/mp4",
+	"mpeg": "video/mpeg",
+	"mpkg": "application/vnd.apple.installer+xml",
+	"oga": "audio/ogg",
+	"ogv": "video/ogg",
+	"ogx": "application/ogg",
+	"otf": "font/otf",
+	"png": "image/png",
+	"pdf": "application/pdf",
+	"php": "application/x-httpd-php",
+	"ppt": "application/vnd.ms-powerpoint",
+	"pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+	"rar": "application/vnd.rar",
+	"rtf": "application/rtf",
+	"sh": "application/x-sh",
+	"svg": "image/svg+xml",
+	"tar": "application/x-tar",
+	"tif": "image/tiff",
+	"tiff": "image/tiff",
+	"ts": "video/mp2t",
+	"ttf": "font/ttf",
+	"txt": "text/plain",
+	"wav": "audio/wav",
+	"webm": "audio/webm",
+	"weba": "video/webm",
+	"webp": "image/webp",
+	"woff": "font/woff",
+	"woff2": "font/woff2",
+	"xhtml": "application/xhtml+xml",
+	"xls": "application/vnd.ms-excel",
+	"xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+	"xml": "application/xml",
+	"zip": "application/zip",
+	"7z": "application/x-7z-compressed"
 };
 Server.CONTENT_TYPES = CONTENT_TYPES;
 
@@ -1320,7 +1322,7 @@ async function editJSON(path, callback = null) {
 }
 
 function getContentType(filename, dismatch = "text/plain") {
-	return CONTENT_TYPES[filename.match(/(\.\w+)$/mi)?.[0]] || dismatch;
+	return CONTENT_TYPES[filename.match(/\.(\w+)$/mi)?.[1]] || dismatch;
 }
 
 function getFileFormat(contentType, dismatch = "") {
