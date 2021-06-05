@@ -102,7 +102,8 @@ class Server extends EventListenerStatic {
 			});
 
 			//Unknown command handler
-			this.stdio.cli.on("unknownCommand", ({input} = e) => {
+			this.stdio.cli.on("unknownCommand", e => {
+				if(e.defaultPrevented) return;
 				this.log("§cUnknow command. Write \"help\" for help.");
 			});
 
