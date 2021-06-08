@@ -41,6 +41,14 @@ class Server extends EventListenerStatic {
 		}
 	};
 
+	/**
+	 * Controls logging of the unknown command error.
+	 * In case you are using `input` event only on `Server.stdio.cli` (and not using `command` event),
+	 * you may want to set this to `false`, so server won't show error every time you input something
+	 * @type {boolean}
+	 */
+	static unknownCommandError = true;
+
 	static TRUSTED_IPS = [];
 	static BLACKLIST = [];
 	static PATH = PATH;
@@ -103,7 +111,7 @@ class Server extends EventListenerStatic {
 
 			//Unknown command handler
 			this.stdio.cli.on("unknownCommand", e => {
-				if(e.defaultPrevented) return;
+				if(e.defaultPrevented || !this.unknownCommandError) return;
 				this.log("§cUnknow command. Write \"help\" for help.");
 			});
 
