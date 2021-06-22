@@ -145,7 +145,7 @@ class Server extends EventListenerStatic {
 		//Init
 		if(!this.title) this.setTitle();
 
-		//HTTP listen
+		//Create HTTP server
 		if(this.config["enable-http-server"]) {
 			this.log("§7Creating HTTP server...");
 			if(!fs.existsSync(PATH.PUBLIC)) {
@@ -167,7 +167,7 @@ class Server extends EventListenerStatic {
 		this.dispatchEvent("load");
 		this.log("§7Server loaded");
 
-		//HTTP listen
+		//Make HTTP server listen for incoming requests
 		if(this.config["enable-http-server"]) {
 			this.http.listen(this.config["http-port"]);
 			this.http.on("listening", e => {
