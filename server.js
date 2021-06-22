@@ -95,6 +95,26 @@ class Server extends EventListenerStatic {
 					this.log("§eCommands:\n§bStop §f- §aStop server\n§bHelp §f- §aShow this menu");
 				} else if(command == "clear") {
 					console.clear();
+				} else if(command == "ban") {
+					const [ip] = args;
+					const ipRegex = /((^\s*((([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]))\s*$)|(^\s*((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))(%.+)?\s*$))/;
+
+					if(ipRegex.test(ip)) {
+						this.BLACKLIST.push(ip);
+						this.log(`IP ${ip} has been banned`);
+						this._saveBlacklist();
+					} else this.log(`§c[ERROR]: Invalid IPv4 or IPv6 address`);
+				} else if(command == "unban") {
+					const [ip] = args;
+					const index = this.BLACKLIST.indexOf(ip);
+
+					if(index > -1) {
+						this.BLACKLIST.splice(index, 1);
+						this.log(`IP ${ip} has been unbanned`);
+						this._saveBlacklist();
+					} else this.log(`§c[ERROR]: Provided IP address is not banned`);
+				} else if(command == "banlist") {
+					this.log(`Blacklisted IPs(${this.BLACKLIST.length}):\n` + this.BLACKLIST.join("\n"));
 				} else if(command == "eval") {
 					try {
 						e.preventDefault();
@@ -158,7 +178,8 @@ class Server extends EventListenerStatic {
 	}
 
 	static stop(code = 0) {
-		this.log("§cStoping server...");
+		this.log("§cStopping server...");
+		this._saveBlacklist();
 		this.dispatchEvent("unload");
 		process.exit(code);
 	}
@@ -177,7 +198,7 @@ class Server extends EventListenerStatic {
 			else this.log(`§2Incomming request from ${HOST ? `§2(${HOST})` : ""}§a${RemoteIP}${ProxyIP ? `§b(${ProxyIP})` : ""}§2: §a${req.method} §a${req.url}`);
 
 			if(IS_BLACKLISTED) {
-				this.warn("Blacklisted IP");
+				this.warn(`Received request from blacklisted IP (${IP})`);
 				return Send(res, "403 Forbidden", 403);
 			}
 		}
@@ -393,6 +414,22 @@ class Server extends EventListenerStatic {
 		this.log(`§7Loaded §f${this.BLACKLIST.length} §7blacklisted IPs`);
 	}
 
+	static _saveBlacklist() {
+		this.log("§7Saving blacklist...");
+		var name = path.basename(PATH.BLACKLIST);
+
+		//Create default
+		if(!fs.existsSync(PATH.BLACKLIST)) {
+			this.log(`§7Creating new blank §f${name} §7file...`);
+			fs.writeFileSync(PATH.BLACKLIST, `[]`);
+		}
+
+		//Save blacklist
+		fs.writeFileSync(PATH.BLACKLIST, JSON.stringify(this.BLACKLIST));
+
+		this.log(`§7Saved §f${this.BLACKLIST.length} §7blacklisted IPs`);
+	}
+
 	static formatMessage(msg) {
 		var codes = ["30", "34", "32", "36", "31", "35", "33", "37", "90", "94", "92", "96", "91", "95", "93", "97"];
 		var message = (msg + "§r§7").replace(/§r/g, "\x1b[0m");
@@ -561,7 +598,7 @@ class RequestEvent extends EventListener.Event {
 	 * @memberof RequestEvent
 	 */
 	post(callback, type = "text") {
-		//TODO: Parse body by content-type header 
+		//TODO: Parse body by content-type header
 		if(typeof callback !== "function") throw new TypeError("'callback' parameter is not type of function");
 
 		if(this.req.method == "POST") {
@@ -632,7 +669,7 @@ class RequestEvent extends EventListener.Event {
 	 * @param {(credentials: Credentials) => any} callback
 	 * @param {string} [realm="realm"]
 	 * @param {Credentials} [credentials=Server.config.login]
-	 * @returns {boolean} 
+	 * @returns {boolean}
 	 * @memberof RequestEvent
 	 */
 	auth(callback = null, realm = "realm", credentials = Server.config.login) {
@@ -696,7 +733,7 @@ class RequestEvent extends EventListener.Event {
 	 * @param {string} filePath
 	 * @param {number} [status=200]
 	 * @param {http.OutgoingHttpHeaders} [headers={}]
-	 * @returns {boolean} 
+	 * @returns {boolean}
 	 * @memberof RequestEvent
 	 */
 	async sendFile(filePath, status = 200, headers = {}) {
@@ -722,7 +759,7 @@ class RequestEvent extends EventListener.Event {
 	 * Stream file using parial content response
 	 * @param {string} filePath
 	 * @param {http.OutgoingHttpHeaders} [headers={}]
-	 * @returns {boolean} 
+	 * @returns {boolean}
 	 * @memberof RequestEvent
 	 */
 	async streamFile(filePath, headers = {}) {
@@ -776,7 +813,7 @@ class CookieJar {
 	 * @param {string|CookieJar.Cookie|http.ServerResponse} cookie Cookie name (requires second parameter), Cookie String, CookieJar.Cookie object, ServerResponseLike object
 	 * @param {string} [value=undefined]
 	 * @param {Object<string,any>} [options={}]
-	 * @returns {CookieJar} 
+	 * @returns {CookieJar}
 	 * @memberof CookieJar
 	 */
 	setCookie(cookie, value = undefined, options = {}) {
@@ -872,7 +909,7 @@ class CookieJar {
 	 * Sends header with cookies
 	 * @param {http.ServerResponse} response Server response object
 	 * @param {boolean} [full=true] Include cookie properties and flags
-	 * @returns {CookieJar.Cookie} 
+	 * @returns {CookieJar.Cookie}
 	 * @memberof CookieJar
 	 */
 	sendCookies(response, full = true) {
@@ -882,7 +919,7 @@ class CookieJar {
 	}
 
 	/**
-	 * Converts Cookie object to cookie string 
+	 * Converts Cookie object to cookie string
 	 * @param {boolean} [full=true] Include cookie properties and flags
 	 * @returns {string} Cookie String
 	 * @memberof CookieJar
@@ -1029,7 +1066,7 @@ const DEFAULT_CONFIG = {
 
 const DEFAULT_MAIN = `const {Server, CookieJar} = require("../server.js");
 
-//Handle load event 
+//Handle load event
 Server.on("load", e => {
 	Server.log("§aThis is my colored message!");
 
@@ -1037,7 +1074,7 @@ Server.on("load", e => {
 	Server.stdio.cli.on("command", cmd => {
 		//'input' is whole input
 		//'command' is issued command
-		//'args' is array of command arguments 
+		//'args' is array of command arguments
 		const {input, command, args} = cmd;
 
 		//'say' command
