@@ -122,6 +122,15 @@ class Server extends EventListenerStatic {
 					} catch(e) {
 						this.log(`[EVAL ERROR]: ` + (e?.message || `Unknown error (${e?.message})`));
 					}
+				} else if(command == "exec") {
+					const [filePath = "autoexec.cfg"] = args;
+
+					fs.promises.readFile(path.join(__dirname, filePath)).catch(err => {
+						this.log(`§c[ERROR]: ${err.message}`);
+					}).then(file => {
+						Server.log(`Executing ${filePath}...`);
+						this.stdio.cli.sendInput(file.toString());
+					});
 				} else if(command == "") {
 
 				} else return;
