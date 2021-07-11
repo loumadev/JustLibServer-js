@@ -25,6 +25,8 @@ class CLI extends EventListener {
 		this.stderr = stderr;
 
 		this.prompt = "> ";
+		this.autocomplete = "";
+		this.hint = "";
 		this.buffer = "";
 		this.current = "";
 		this.cursor = 0;
@@ -32,6 +34,8 @@ class CLI extends EventListener {
 		this.history = [];
 		this.isResumed = false;
 		this.printCommand = true;
+
+		this._hasHint = false;
 
 		this.KEY = {...KEY, ...customKeyMap};
 	}
@@ -69,6 +73,16 @@ class CLI extends EventListener {
 
 	setPrompt(prompt) {
 		this.prompt = prompt;
+		this._updateCLI();
+	}
+
+	setHint(hint) {
+		this.hint = hint || null;
+		this._updateCLI();
+	}
+
+	setAutocomplete(text) {
+		this.autocomplete = text || null;
 		this._updateCLI();
 	}
 
@@ -116,8 +130,20 @@ class CLI extends EventListener {
 	}
 
 	_updateCLI() {
-		const offset = this.buffer.length - this.cursor;
-		this.stdout.__write.apply(this.stdout, ["\r\x1b[K" + this.prompt + this.buffer + (offset ? "\x1b[" + offset + "D" : "")]);
+		const offset = this.prompt.length + this.cursor + 1;
+
+		const START = `\x1b[1G`;
+		const UP = `\x1bA`;
+		const DOWN = `\x1bB`;
+		const ERASE_LINE = `\x1b[K`;
+		const OFFSET_CURSOR = `\x1b[${offset}G`;
+
+		const autocomplete = this.autocomplete || "";
+		const hint = this.hint ? `\n${this.hint}${UP}` : "";
+
+		const output = `${START}${ERASE_LINE}${this.prompt}${this.buffer}${autocomplete}${START}${hint}${OFFSET_CURSOR}`;
+
+		this.stdout.__write.apply(this.stdout, [output]);
 	}
 
 	_unescape(string) {
@@ -256,7 +282,5 @@ const KEY = {
 	CTRL_ARROW_RIGHT: [27, 91, 49, 59, 53, 67]
 };
 
-exports = {
-	CLI,
-	KEY
-};
+exports.CLI = CLI;
+exports.KEY = KEY;
