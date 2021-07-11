@@ -23,7 +23,6 @@ class CLI extends EventListener {
 		this.stdin = stdin;
 		this.stdout = stdout;
 		this.stderr = stderr;
-		/*this.fixPromises = fixPromises;*/
 
 		this.prompt = "> ";
 		this.buffer = "";
@@ -56,17 +55,6 @@ class CLI extends EventListener {
 		this.stderr?.setEncoding?.("utf8");
 		this.stderr.__write = this.stderr.write;
 		this.stderr.write = (string, encoding, fd) => {
-			/*if(this.fixPromises) {
-				if(string.includes("UnhandledPromiseRejectionWarning: Unhandled promise rejection. This error originated either by")) return;
-				if(string.includes("DeprecationWarning: Unhandled promise rejections are deprecated. In the future, promise rejections")) return;
-
-				//console.log([...string].join("") == string);
-				//console.log([...string].join("").match(/(UnhandledPromiseRejectionWarning: [\s\S]+?)(\(Use |\n)/));
-				//console.log(string.match(/(UnhandledPromiseRejectionWarning: [\s\S]+)(\(Use |\n)/));
-
-				string = (string.match(/(UnhandledPromiseRejectionWarning: [\s\S]+)(\(Use |\n)/) || "")[1] || string;
-				if(!string.endsWith("\n")) string += "\n";
-			}*/
 			this.stderr.__write.apply(this.stderr, [(this.isResumed ? "\r\x1b[K\r\x1b[K" : "") + string, encoding, fd]);
 			this._updateCLI();
 			this.dispatchEvent("stderr", {data: string, string: this._unescape(string)});
