@@ -99,8 +99,8 @@ class CLI extends EventListener {
 	}
 
 	sendInput(input, cli = this, targetStream = this.stdout) {
-		var args = input.trim().split(" ");
-		var command = args.shift();
+		const args = input.trim().split(" ");
+		const command = args.shift();
 
 		//Output
 		if(this.printCommand) this.dispatchEvent("stdout", {data: (cli.prompt + input + "\n"), string: cli._unescape(cli.prompt + input + "\n")});
@@ -128,7 +128,7 @@ class CLI extends EventListener {
 	}
 
 	_updateCLI() {
-		var offset = this.buffer.length - this.cursor;
+		const offset = this.buffer.length - this.cursor;
 		this.stdout.__write.apply(this.stdout, ["\r\x1b[K" + this.prompt + this.buffer + (offset ? "\x1b[" + offset + "D" : "")]);
 	}
 
@@ -190,15 +190,15 @@ class CLI extends EventListener {
 				stream.__write.apply(stream, [key]);
 		}
 		else if(this._keyCompare(buffer, this.KEY.CTRL_ARROW_LEFT)) {
-			var jumps = [...this.buffer.matchAll(/\b/g)].map(e => e.index).reverse();
-			var index = jumps.find(e => e < this.cursor && this.cursor - e != 1) || 0;
+			const jumps = [...this.buffer.matchAll(/\b/g)].map(e => e.index).reverse();
+			const index = jumps.find(e => e < this.cursor && this.cursor - e != 1) || 0;
 
 			this.cursor = index;
 			this._updateCLI();
 		}
 		else if(this._keyCompare(buffer, this.KEY.CTRL_ARROW_RIGHT)) {
-			var jumps = [...this.buffer.matchAll(/\b/g)].map(e => e.index);
-			var index = jumps.find(e => e > this.cursor && e - this.cursor != 1) || this.buffer.length;
+			const jumps = [...this.buffer.matchAll(/\b/g)].map(e => e.index);
+			const index = jumps.find(e => e > this.cursor && e - this.cursor != 1) || this.buffer.length;
 
 			this.cursor = index;
 			this._updateCLI();
@@ -216,8 +216,8 @@ class CLI extends EventListener {
 			this._updateCLI();
 		}
 		else if(this._keyCompare(buffer, this.KEY.CTRL_BACKSPACE)) {
-			var jumps = [...this.buffer.matchAll(/\b/g)].map(e => e.index).reverse();
-			var index = jumps.find(e => e < this.cursor && this.cursor - e != 1) || 0;
+			const jumps = [...this.buffer.matchAll(/\b/g)].map(e => e.index).reverse();
+			const index = jumps.find(e => e < this.cursor && this.cursor - e != 1) || 0;
 
 			this.buffer = this.buffer.substring(0, index) + this.buffer.substring(this.cursor + 1);
 			this.cursor = index;
@@ -225,8 +225,8 @@ class CLI extends EventListener {
 			this._updateCLI();
 		}
 		else if(this._keyCompare(buffer, this.KEY.CTRL_DELETE)) {
-			var jumps = [...this.buffer.matchAll(/\b/g)].map(e => e.index);
-			var index = jumps.find(e => e > this.cursor && e - this.cursor != 1) || this.buffer.length;
+			const jumps = [...this.buffer.matchAll(/\b/g)].map(e => e.index);
+			const index = jumps.find(e => e > this.cursor && e - this.cursor != 1) || this.buffer.length;
 
 			this.buffer = this.buffer.substring(0, this.cursor) + this.buffer.substring(index + 1);
 
@@ -268,6 +268,7 @@ const KEY = {
 	CTRL_ARROW_RIGHT: [27, 91, 49, 59, 53, 67]
 };
 
-exports.CLI = CLI;
-exports.KEY = KEY;
-
+exports = {
+	CLI,
+	KEY
+};
