@@ -35,8 +35,6 @@ class CLI extends EventListener {
 		this.isResumed = false;
 		this.printCommand = true;
 
-		this._hasHint = false;
-
 		this.KEY = {...KEY, ...customKeyMap};
 	}
 
@@ -72,7 +70,7 @@ class CLI extends EventListener {
 	}
 
 	setPrompt(prompt) {
-		this.prompt = prompt;
+		this.prompt = prompt || "";
 		this._updateCLI();
 	}
 
@@ -87,7 +85,7 @@ class CLI extends EventListener {
 	}
 
 	setPrintCommand(state) {
-		this.printCommand = state;
+		this.printCommand = !!state;
 	}
 
 	pause() {
