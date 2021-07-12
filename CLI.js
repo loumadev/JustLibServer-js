@@ -231,7 +231,7 @@ class CLI extends EventListener {
 			const jumps = [...this.buffer.matchAll(/\b/g)].map(e => e.index).reverse();
 			const index = jumps.find(e => e < this.cursor && this.cursor - e != 1) || 0;
 
-			this.buffer = this.buffer.substring(0, index) + this.buffer.substring(this.cursor + 1);
+			this.buffer = this.buffer.substring(0, index) + this.buffer.substring(this.cursor);
 			this.cursor = index;
 
 			this._updateCLI();
@@ -240,7 +240,7 @@ class CLI extends EventListener {
 			const jumps = [...this.buffer.matchAll(/\b/g)].map(e => e.index);
 			const index = jumps.find(e => e > this.cursor && e - this.cursor != 1) || this.buffer.length;
 
-			this.buffer = this.buffer.substring(0, this.cursor) + this.buffer.substring(index + 1);
+			this.buffer = this.buffer.substring(0, this.cursor) + this.buffer.substring(index);
 
 			this._updateCLI();
 		}
