@@ -675,7 +675,7 @@ class RequestEvent extends EventListener.Event {
 	// eslint-disable-next-line valid-jsdoc
 	/**
 	 * Authentication
-	 * @param {(credentials: Credentials) => any} callback
+	 * @param {(credentials: Credentials) => void | null} callback
 	 * @param {string} [realm="realm"]
 	 * @param {Credentials} [credentials=Server.config.login]
 	 * @returns {boolean}
