@@ -675,10 +675,10 @@ class RequestEvent extends EventListener.Event {
 	// eslint-disable-next-line valid-jsdoc
 	/**
 	 * Authentication
-	 * @param {(credentials: Credentials) => void | null} callback
-	 * @param {string} [realm="realm"]
-	 * @param {Credentials} [credentials=Server.config.login]
-	 * @returns {boolean}
+	 * @param {(credentials: Credentials) => void | null} callback  If `null` no login is required, otherwise the user will be prompted with login popup (if the login will be required)
+	 * @param {string} [realm="realm"] Set when dealing with multiple login sessions
+	 * @param {Credentials} [credentials=Server.config.login] Use custom `Credentials` object (default is `login` field in server config file)
+	 * @returns {boolean} `true` if the user is logged in, otherwise `false`
 	 * @memberof RequestEvent
 	 */
 	auth(callback = null, realm = "realm", credentials = Server.config.login) {
