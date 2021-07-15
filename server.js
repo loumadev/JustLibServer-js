@@ -685,19 +685,29 @@ class RequestEvent extends EventListener.Event {
 		var auth = this.req.headers.authorization;
 		var basic = auth?.match(/Basic ([A-Za-z0-9+\/]*)/)?.[1];
 		var bearer = auth?.match(/Bearer ([A-Za-z0-9+\/=\-_.~]*)/)?.[1];
+		const forceLogin = callback !== null;
 
 		//Handle callback type
-		if(!callback) callback = () => { };
-		if(typeof callback !== "function") throw new TypeError(`Callback '${callback}' is not type of function or null`);
+		if(forceLogin && typeof callback !== "function") throw new TypeError(`Callback '${callback}' is not type of function or null`);
 
 		//No auth header
-		if(!auth && (!basic || !bearer)) return this.send("", 401, "text/html", {"www-authenticate": `Basic realm="${realm}"`}), false;
+		if(!auth && (!basic || !bearer)) {
+			if(forceLogin) this.send("", 401, "text/html", {"www-authenticate": `Basic realm="${realm}"`});
+			return false;
+		}
 
 		//Bearer auth
 		if(typeof credentials.token !== "undefined") {
 			//Check access
-			if(bearer == credentials.token) return Server.log(`§eToken '${bearer}' just used!`), callback(credentials), true;
-			else return Server.log(`§eInvalid token attempt '${bearer}'!`), this.send("401 Unauthorized", 401), false;
+			if(bearer == credentials.token) {
+				Server.log(`§eToken '${bearer}' just used!`);
+				if(forceLogin) callback(credentials);
+				return true;
+			} else {
+				Server.log(`§eInvalid token attempt '${bearer}'!`);
+				if(forceLogin) this.send("401 Unauthorized", 401);
+				return false;
+			}
 		}
 
 		//Basic auth
@@ -707,17 +717,27 @@ class RequestEvent extends EventListener.Event {
 				var [username, password] = atob(basic).split(":");
 			} catch(e) {
 				Server.error(e);
-				return this.send("500 Error occured while decoding credentials", 401), false;
+
+				this.send("500 Error occured while decoding credentials", 401);
+				return false;
 			}
 
 			//Check access
-			if(username == credentials.username && password == credentials.password) return Server.log(`§eUser '${username}' just logged in!`), callback(credentials), true;
-			else return Server.log(`§eUnsuccessful login attempt '${username}:${password}'!`), this.send("401 Unauthorized", 401), false;
+			if(username == credentials.username && password == credentials.password) {
+				Server.log(`§eUser '${username}' just logged in!`);
+				if(forceLogin) callback(credentials);
+				return true;
+			}
+			else {
+				Server.log(`§eUnsuccessful login attempt '${username}:${password}'!`);
+				if(forceLogin) this.send("401 Unauthorized", 401);
+				return false;
+			}
 		}
 
 		//Unsupported auth
 		this.send("500 Cannot process provided authentication type", 500);
-		throw new TypeError("Invalid credentials / unsupported authentication type", credentials);
+		throw new TypeError("Invalid credentials / unsupported authentication type", credentials, auth);
 	}
 
 	/**
