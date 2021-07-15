@@ -653,10 +653,10 @@ class RequestEvent extends EventListener.Event {
 	/**
 	 * Redirects destination path to another local path
 	 * @example Server.on("/instagram", e => {
-	 * e.redirect("https://www.instagram.com/example");
+	 * e.redirectURL("https://www.instagram.com/example");
 	 * });
 	 * @example Server.on("/dashboard", e => {
-	 * e.redirect("/login");  //This will get converted to absolute path internally
+	 * e.redirectURL("/login");  //This will get converted to absolute path internally
 	 * });
 	 * @param {string} destination
 	 * @param {number} [status=307]
