@@ -675,7 +675,7 @@ class RequestEvent extends EventListener.Event {
 	// eslint-disable-next-line valid-jsdoc
 	/**
 	 * Authentication
-	 * @param {(credentials: Credentials) => void | null} callback  If `null` no login is required, otherwise the user will be prompted with login popup (if the login will be required)
+	 * @param {(credentials: Credentials) => void | null | false} callback  If `false` no login is required, otherwise the user will be prompted with login popup (if the login will be required)
 	 * @param {string} [realm="realm"] Set when dealing with multiple login sessions
 	 * @param {Credentials} [credentials=Server.config.login] Use custom `Credentials` object (default is `login` field in server config file)
 	 * @returns {boolean} `true` if the user is logged in, otherwise `false`
@@ -685,10 +685,11 @@ class RequestEvent extends EventListener.Event {
 		var auth = this.req.headers.authorization;
 		var basic = auth?.match(/Basic ([A-Za-z0-9+\/]*)/)?.[1];
 		var bearer = auth?.match(/Bearer ([A-Za-z0-9+\/=\-_.~]*)/)?.[1];
-		const forceLogin = callback !== null;
+		const forceLogin = callback !== false;
+		const hasCallback = callback !== null;
 
 		//Handle callback type
-		if(forceLogin && typeof callback !== "function") throw new TypeError(`Callback '${callback}' is not type of function or null`);
+		if(hasCallback && forceLogin && typeof callback !== "function") throw new TypeError(`Callback '${callback}' is not type of function or null`);
 
 		//No auth header
 		if(!auth && (!basic || !bearer)) {
@@ -701,7 +702,7 @@ class RequestEvent extends EventListener.Event {
 			//Check access
 			if(bearer == credentials.token) {
 				Server.log(`§eToken '${bearer}' just used!`);
-				if(forceLogin) callback(credentials);
+				if(hasCallback) callback(credentials);
 				return true;
 			} else {
 				Server.log(`§eInvalid token attempt '${bearer}'!`);
@@ -725,10 +726,9 @@ class RequestEvent extends EventListener.Event {
 			//Check access
 			if(username == credentials.username && password == credentials.password) {
 				Server.log(`§eUser '${username}' just logged in!`);
-				if(forceLogin) callback(credentials);
+				if(hasCallback) callback(credentials);
 				return true;
-			}
-			else {
+			} else {
 				Server.log(`§eUnsuccessful login attempt '${username}:${password}'!`);
 				if(forceLogin) this.send("401 Unauthorized", 401);
 				return false;
