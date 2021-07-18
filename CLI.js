@@ -137,7 +137,7 @@ class CLI extends EventListener {
 		const OFFSET_CURSOR = `\x1b[${offset}G`;
 
 		const autocomplete = this.autocomplete || "";
-		const hint = this.hint ? `\n${this.hint}${UP}` : "";
+		const hint = this.hint ? `\n${ERASE_LINE}${this.hint}${UP}` : "";
 
 		const output = `${START}${ERASE_LINE}${this.prompt}${this.buffer}${autocomplete}${START}${hint}${OFFSET_CURSOR}`;
 
