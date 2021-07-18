@@ -34,6 +34,7 @@ class CLI extends EventListener {
 		this.history = [];
 		this.isResumed = false;
 		this.printCommand = true;
+		this.hasHint = false;
 
 		this.KEY = {...KEY, ...customKeyMap};
 	}
@@ -76,6 +77,7 @@ class CLI extends EventListener {
 
 	setHint(hint) {
 		this.hint = hint || null;
+		if(this.hint) this.hasHint = true;
 		this._updateCLI();
 	}
 
@@ -137,7 +139,7 @@ class CLI extends EventListener {
 		const OFFSET_CURSOR = `\x1b[${offset}G`;
 
 		const autocomplete = this.autocomplete || "";
-		const hint = this.hint ? `\n${ERASE_LINE}${this.hint}${UP}` : "";
+		const hint = this.hint ? `\n${ERASE_LINE}${this.hint}${UP}` : this.hasHint && !(this.hasHint = false) ? `\n${ERASE_LINE}${UP}` : "";
 
 		const output = `${START}${ERASE_LINE}${this.prompt}${this.buffer}${autocomplete}${START}${hint}${OFFSET_CURSOR}`;
 
