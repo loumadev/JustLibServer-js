@@ -1461,6 +1461,7 @@ function decrypt(hash, strength) {
 
 module.exports = {
 	Server,
+	RequestEvent,
 	CookieJar,
 	CLI,
 	KEY,
