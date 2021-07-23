@@ -70,7 +70,7 @@ class Server extends EventListenerStatic {
 		});
 
 		var startDate = new Date();
-		this.log("§7Starting initialisation...");
+		this.log("§7Starting initialization...");
 
 		//Config
 		this.log("§7Loading properties...");
@@ -141,7 +141,7 @@ class Server extends EventListenerStatic {
 			//Unknown command handler
 			this.stdio.cli.on("unknownCommand", e => {
 				if(e.defaultPrevented || !this.unknownCommandError) return;
-				this.log("§cUnknow command. Write \"help\" for help.");
+				this.log("§cUnknown command. Write \"help\" for help.");
 			});
 
 			/*fs.writeFileSync("stdout.log", "");
@@ -181,9 +181,9 @@ class Server extends EventListenerStatic {
 			this.http.listen(this.config["http-port"]);
 			this.http.on("listening", e => {
 				this.log("§7Server listen on port §f" + this.config["http-port"]);
-				this.log(`§7Initialisation done (§ftook ${new Date() - startDate}ms§7)`);
+				this.log(`§7Initialization done (§ftook ${new Date() - startDate}ms§7)`);
 			});
-		} else this.log(`§7Initialisation done (§ftook ${new Date() - startDate}ms§7)`);
+		} else this.log(`§7Initialization done (§ftook ${new Date() - startDate}ms§7)`);
 	}
 
 	static stop(code = 0) {
@@ -203,8 +203,8 @@ class Server extends EventListenerStatic {
 		const IS_BLACKLISTED = this.BLACKLIST.map(e => IP.includes(e)).includes(true);
 
 		if(!redirectTo) {
-			if(IS_TRUSTED) this.log(`§2Incomming request from ${HOST ? `§2(${HOST})` : ""}§2${RemoteIP}${ProxyIP ? `§3(${ProxyIP})` : ""}§2: §2${req.method} §2${req.url}`);
-			else this.log(`§2Incomming request from ${HOST ? `§2(${HOST})` : ""}§a${RemoteIP}${ProxyIP ? `§b(${ProxyIP})` : ""}§2: §a${req.method} §a${req.url}`);
+			if(IS_TRUSTED) this.log(`§2Incoming request from ${HOST ? `§2(${HOST})` : ""}§2${RemoteIP}${ProxyIP ? `§3(${ProxyIP})` : ""}§2: §2${req.method} §2${req.url}`);
+			else this.log(`§2Incoming request from ${HOST ? `§2(${HOST})` : ""}§a${RemoteIP}${ProxyIP ? `§b(${ProxyIP})` : ""}§2: §a${req.method} §a${req.url}`);
 
 			if(IS_BLACKLISTED) {
 				this.warn(`Received request from blacklisted IP (${IP})`);
@@ -318,7 +318,7 @@ class Server extends EventListenerStatic {
 	}
 
 	static _loadConfig() {
-		this.log("§7Loading cofiguration...");
+		this.log("§7Loading configuration...");
 		var name = path.basename(PATH.CONFIG);
 
 		//Create default
@@ -347,7 +347,7 @@ class Server extends EventListenerStatic {
 		//Apply config
 		this.config = config;
 
-		this.log("§7Cofiguration loaded");
+		this.log("§7Configuration loaded");
 	}
 
 	static _loadModules() {
@@ -575,7 +575,7 @@ class RequestEvent extends EventListener.Event {
 		this.autoPrevent;
 
 		/**
-		 * @type {string[]} Array of matches, if wildcard hander was used
+		 * @type {string[]} Array of matches, if wildcard handler was used
 		 */
 		this.matches;
 	}
@@ -719,7 +719,7 @@ class RequestEvent extends EventListener.Event {
 			} catch(e) {
 				Server.error(e);
 
-				this.send("500 Error occured while decoding credentials", 401);
+				this.send("500 Error occurred while decoding credentials", 401);
 				return false;
 			}
 
@@ -785,7 +785,7 @@ class RequestEvent extends EventListener.Event {
 	}
 
 	/**
-	 * Stream file using parial content response
+	 * Stream file using partial content response
 	 * @param {string} filePath
 	 * @param {http.OutgoingHttpHeaders} [headers={}]
 	 * @returns {boolean}
@@ -906,7 +906,7 @@ class CookieJar {
 	}
 
 	/**
-	 * Retrns cookie object found by name
+	 * Returns cookie object found by name
 	 * @param {string} name Cookie name
 	 * @returns {CookieJar.Cookie} Cookie object if found, otherwise undefined
 	 * @memberof CookieJar
@@ -971,7 +971,7 @@ class CookieJar {
 	/**
 	 * Checks if the Jar contains cookie with certain name
 	 * @param {string} name Cookie name
-	 * @returns {boolean} true if Jar contians cookie with certain name, otherwise false
+	 * @returns {boolean} true if Jar contains cookie with certain name, otherwise false
 	 * @memberof CookieJar
 	 */
 	includes(name) {
@@ -1117,7 +1117,7 @@ Server.on("load", e => {
 		//This is not our command, just ignore it
 		else return;
 
-		//Remeber to always prevent default action of the event,
+		//Remember to always prevent default action of the event,
 		//otherwise 'unknownCommand' event will be fired!
 		e.preventDefault();
 	});
@@ -1212,7 +1212,7 @@ Server.on("/request", e => {
 		cookies.send(res);
 
 		//Send successful response
-		e.send("POST: Your new session toeken has been generated! You can log in now!" + body);
+		e.send("POST: Your new session token has been generated! You can log in now!" + body);
 	});
 });`;
 
@@ -1403,12 +1403,12 @@ async function editJSON(path, callback = null) {
 	} else return json;
 }
 
-function getContentType(filename, dismatch = "text/plain") {
-	return CONTENT_TYPES[filename.match(/\.(\w+)$/mi)?.[1]] || dismatch;
+function getContentType(filename, mismatch = "text/plain") {
+	return CONTENT_TYPES[filename.match(/\.(\w+)$/mi)?.[1]] || mismatch;
 }
 
-function getFileFormat(contentType, dismatch = "") {
-	return Object.keys(CONTENT_TYPES).find(key => CONTENT_TYPES[key] == contentType) || dismatch;
+function getFileFormat(contentType, mismatch = "") {
+	return Object.keys(CONTENT_TYPES).find(key => CONTENT_TYPES[key] == contentType) || mismatch;
 }
 
 function getAllFiles(dirPath, depth = Infinity, i = 0, arrayOfFiles = []) {
