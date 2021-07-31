@@ -229,7 +229,8 @@ class Server extends EventListenerStatic {
 			query: URL.query,
 			IS_TRUSTED,
 			defaultPreventable: true,
-			autoPrevent: true
+			autoPrevent: true,
+			headers: req.headers
 		});
 
 		//Fix destination path ending with "/"
@@ -578,6 +579,11 @@ class RequestEvent extends EventListener.Event {
 		 * @type {string[]} Array of matches, if wildcard handler was used
 		 */
 		this.matches;
+
+		/**
+		 * @type {http.IncomingHttpHeaders} HTTP headers sent by the client
+		 */
+		this.headers;
 	}
 
 	// eslint-disable-next-line valid-jsdoc
