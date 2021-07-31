@@ -830,6 +830,16 @@ class RequestEvent extends EventListener.Event {
 		Server._connectionLog(status);
 		return true;
 	}
+
+	/**
+	 * Set header to be sent with response
+	 * @param {string} name
+	 * @param {number | string | ReadonlyArray<string>} value
+	 * @memberof RequestEvent
+	 */
+	setHeader(name, value) {
+		this.res.setHeader(name, value);
+	}
 }
 
 
