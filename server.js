@@ -1139,6 +1139,11 @@ Server.on("load", e => {
 	});
 });
 
+//Root handler
+Server.on("/", e => {
+	e.send("Hello World, from the server!");
+});
+
 //Handle simple request
 Server.on("/hello", e => {
 	e.send("Hey!");
@@ -1165,10 +1170,10 @@ Server.on("/user/*/*", e => {
 });
 
 //Redirect request to another path
-Server.on("/", e => {
-	//Since there is no "/index.html" handler this will
-	//respond with file "/public/index.html" (if it exists)
-	e.redirect("/index.html");
+Server.on("/home", e => {
+	//Since there is no "/home.html" handler this will
+	//respond with file "/public/home.html" (if it exists)
+	e.redirect("/home.html");
 });
 
 //Handle different request methods
