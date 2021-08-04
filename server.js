@@ -194,6 +194,8 @@ class Server extends EventListenerStatic {
 	}
 
 	static _handleRequest(req, res, redirectTo = null) {
+		//TODO: Add error handling
+		//TODO: Add error event (ability to send custom 500 Internal Server Error)
 		const RemoteIP = req.connection.remoteAddress.split(":")[3];
 		const ProxyIP = req.headers["x-forwarded-for"];
 		const HOST = req.headers["host"];
@@ -283,6 +285,7 @@ class Server extends EventListenerStatic {
 			try {
 				EventObject.streamFile(path.join(PATH.PUBLIC, destinationPath.slice(1)));
 			} catch(err) {
+				//TODO: Add not found event (ability to send custom 404 Not Found)
 				EventObject.send("404 Not Found", 404);
 			}
 		}
@@ -761,6 +764,7 @@ class RequestEvent extends EventListener.Event {
 			Send(this.res, data, status, contentType, headers);
 			Server._connectionLog(status);
 		} else Server.warn(`Failed to write response after end. ('e.send()'/'e.streamFile()' might be called multiple times)`);
+		//TODO: Add more info to the warning (create separate method + include stack trace)
 	}
 
 	/**
