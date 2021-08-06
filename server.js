@@ -612,13 +612,21 @@ class RequestEvent extends EventListener.Event {
 	/**
 	 * Handles POST method
 	 * @param {(bodyParsed: string | Object<string, any>, bodyBuffer: Buffer) => void} callback Request callback function
-	 * @param {"text" | "json" | "form"} [type="text"] Request body type (Default: "text")
+	 * @param {"text" | "json" | "form" | "raw"} [type] Request body type (Default: depending on `content-type` header)
 	 * @returns {boolean} True if request was successfully handled, otherwise false
 	 * @memberof RequestEvent
 	 */
-	post(callback, type = "text") {
-		//TODO: Parse body by content-type header
+	post(callback, type) {
 		if(typeof callback !== "function") throw new TypeError("'callback' parameter is not type of function");
+
+		if(!type) {
+			const contentType = this.headers["content-type"];
+
+			if(contentType.indexOf("application/json") != -1) type = "json";
+			else if(contentType.indexOf("application/x-www-form-urlencoded") != -1) type = "form";
+			else if(contentType.indexOf("text") != -1) type = "text";
+			else type = "raw";
+		}
 
 		if(this.req.method == "POST") {
 			if(this.autoPrevent) this.defaultPrevented = true;
@@ -631,18 +639,22 @@ class RequestEvent extends EventListener.Event {
 
 			this.req.on("end", () => {
 				const buffer = Buffer.concat(chunks);
-				let body = buffer;
+				let body = undefined;
 
 				if(type == "json") {
 					try {
 						body = JSON.parse(body);
 					} catch(e) {
-						body = undefined;
+						body = null;
 					}
 				} else if(type == "form") {
 					body = getQueryParameters(body);
 				} else if(type == "text") {
 					body = buffer.toString();
+				} else if(type == "raw") {
+					body = buffer;
+				} else {
+					throw new TypeError(`'${type}' is invalid content type`);
 				}
 
 				callback(body, buffer);
