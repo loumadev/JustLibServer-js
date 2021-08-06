@@ -642,6 +642,8 @@ class RequestEvent extends EventListener.Event {
 		} else return false;
 	}
 
+	//TODO: Add more methods
+
 	/**
 	 * Redirects destination path to another local path
 	 * @example Server.on("/home", e => {
@@ -650,6 +652,7 @@ class RequestEvent extends EventListener.Event {
 	 * @param {string} destination
 	 * @memberof RequestEvent
 	 */
+	//TODO: Rename to `redirectRequest`
 	redirect(destination) {
 		if(typeof destination !== "string") throw new TypeError("'destination' parameter is not type of string");
 
@@ -671,6 +674,7 @@ class RequestEvent extends EventListener.Event {
 	 * @param {number} [status=307]
 	 * @memberof RequestEvent
 	 */
+	//TODO: Rename to `redirect`
 	redirectURL(destination, status = 307) {
 		if(typeof destination !== "string") throw new TypeError("'destination' parameter is not type of string");
 
