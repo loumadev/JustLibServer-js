@@ -69,7 +69,7 @@ class Server extends EventListenerStatic {
 			this.error("Unhandled Promise Rejection at:", promise);
 		});
 
-		var startDate = new Date();
+		const startDate = new Date();
 		this.log("§7Starting initialization...");
 
 		//Config
@@ -244,9 +244,9 @@ class Server extends EventListenerStatic {
 		if(!EventObject.defaultPrevented) this.dispatchEvent(destinationPath, EventObject);
 
 		//Dynamic destination path search
-		var searchDispatched = [];
-		for(var listener of this.listeners) {
-			var type = listener.type;
+		const searchDispatched = [];
+		for(const listener of this.listeners) {
+			const type = listener.type;
 
 			//Event was prevented
 			if(EventObject.defaultPrevented) break;
@@ -266,7 +266,7 @@ class Server extends EventListenerStatic {
 
 			//Listener uses dynamic representation of destination path
 			if(listener.regex) {
-				var match = destinationPath.match(listener.regex);
+				const match = destinationPath.match(listener.regex);
 
 				//Destination path does not match required pattern
 				if(!match) continue;
@@ -292,14 +292,14 @@ class Server extends EventListenerStatic {
 	}
 
 	static readRangeHeader(req, totalLength) {
-		var header = req.headers["range"];
+		const header = req.headers["range"];
 
 		if(!header) return null;
 
-		var array = header.split(/bytes=([0-9]*)-([0-9]*)/);
-		var start = parseInt(array[1]);
-		var end = parseInt(array[2]);
-		var range = {
+		const array = header.split(/bytes=([0-9]*)-([0-9]*)/);
+		const start = parseInt(array[1]);
+		const end = parseInt(array[2]);
+		const range = {
 			start: isNaN(start) ? 0 : start,
 			end: isNaN(end) ? (totalLength - 1) : end
 		};
@@ -323,7 +323,7 @@ class Server extends EventListenerStatic {
 
 	static _loadConfig() {
 		this.log("§7Loading configuration...");
-		var name = path.basename(PATH.CONFIG);
+		const name = path.basename(PATH.CONFIG);
 
 		//Create default
 		if(!fs.existsSync(PATH.CONFIG)) {
@@ -332,11 +332,11 @@ class Server extends EventListenerStatic {
 		}
 
 		//Get current config
-		var config = JSON.parse(fs.readFileSync(PATH.CONFIG).toString());
-		var changes = 0;
+		const config = JSON.parse(fs.readFileSync(PATH.CONFIG).toString());
+		let changes = 0;
 
 		//Get missing options
-		for(var property in DEFAULT_CONFIG) {
+		for(const property in DEFAULT_CONFIG) {
 			if(property in config) continue;
 			config[property] = DEFAULT_CONFIG[property];
 			changes++;
@@ -368,7 +368,7 @@ class Server extends EventListenerStatic {
 
 		//Load modules
 		const files = getAllFiles(PATH.MODULES, 1);
-		for(var file of files) {
+		for(const file of files) {
 			let project = path.basename(path.dirname(file)); if(project == dirname) project = null;
 			const filename = path.basename(file);
 			const moduleName = (project ? project + "/" : "") + filename;
@@ -397,7 +397,7 @@ class Server extends EventListenerStatic {
 
 	static _loadTrustedIPs() {
 		this.log("§7Loading trusted IPs...");
-		var name = path.basename(PATH.TRUSTED_IPS);
+		const name = path.basename(PATH.TRUSTED_IPS);
 
 		//Create default
 		if(!fs.existsSync(PATH.TRUSTED_IPS)) {
@@ -413,7 +413,7 @@ class Server extends EventListenerStatic {
 
 	static _loadBlacklist() {
 		this.log("§7Loading blacklist...");
-		var name = path.basename(PATH.BLACKLIST);
+		const name = path.basename(PATH.BLACKLIST);
 
 		//Create default
 		if(!fs.existsSync(PATH.BLACKLIST)) {
@@ -429,7 +429,7 @@ class Server extends EventListenerStatic {
 
 	static _saveBlacklist() {
 		this.log("§7Saving blacklist...");
-		var name = path.basename(PATH.BLACKLIST);
+		const name = path.basename(PATH.BLACKLIST);
 
 		//Create default
 		if(!fs.existsSync(PATH.BLACKLIST)) {
@@ -444,17 +444,18 @@ class Server extends EventListenerStatic {
 	}
 
 	static formatMessage(msg) {
-		var codes = ["30", "34", "32", "36", "31", "35", "33", "37", "90", "94", "92", "96", "91", "95", "93", "97"];
-		var message = (msg + "§r§7").replace(/§r/g, "\x1b[0m");
+		const codes = ["30", "34", "32", "36", "31", "35", "33", "37", "90", "94", "92", "96", "91", "95", "93", "97"];
+		const message = (msg + "§r§7").replace(/§r/g, "\x1b[0m");
 
-		var arr = message.split("§");
-		var formatted = arr[0];
+		const arr = message.split("§");
+		let formatted = arr[0];
 
 		if(arr.length > 1) {
 			arr.shift();
-			for(var i = 0; i < arr.length; i++) {
-				var match = arr[i].match(/^[0-9a-f]/);
-				if(match) formatted += "\x1b[" + codes[parseInt(match[0], 16)] + "m" + arr[i].substr(1);
+			for(let i = 0; i < arr.length; i++) {
+				const match = arr[i].match(/^[0-9a-f]/);
+
+				if(match) formatted += `\x1b[${codes[parseInt(match[0], 16)]}m${arr[i].substr(1)}`;
 				else continue;
 			}
 		} else {
@@ -695,9 +696,10 @@ class RequestEvent extends EventListener.Event {
 	 * @memberof RequestEvent
 	 */
 	auth(callback = null, realm = "realm", credentials = Server.config.login) {
-		var auth = this.req.headers.authorization;
-		var basic = auth?.match(/Basic ([A-Za-z0-9+\/]*)/)?.[1];
-		var bearer = auth?.match(/Bearer ([A-Za-z0-9+\/=\-_.~]*)/)?.[1];
+		const auth = this.req.headers.authorization;
+		const basic = auth?.match(/Basic ([A-Za-z0-9+\/]*)/)?.[1];
+		const bearer = auth?.match(/Bearer ([A-Za-z0-9+\/=\-_.~]*)/)?.[1];
+
 		const forceLogin = callback !== false;
 		const hasCallback = callback !== null;
 
@@ -809,7 +811,7 @@ class RequestEvent extends EventListener.Event {
 		this.preventDefault();
 		if(this.res.writableEnded) return Server.warn(`Failed to write response after end. ('e.send()'/'e.streamFile()' might be called multiple times)`), false;
 
-		var status = 0;
+		let status = 0;
 		const contentType = getContentType(filePath);
 		const stat = await fs.promises.stat(filePath).catch(() => { }); if(!stat || stat.isDirectory()) return Send(this.res, "404 Not Found", status = 404), Server._connectionLog(status), false;
 		const range = Server.readRangeHeader(this.req, stat.size);
@@ -872,11 +874,11 @@ class CookieJar {
 	setCookie(cookie, value = undefined, options = {}) {
 		//Set by name=value
 		if(typeof value !== "undefined") {
-			var _cookie = new CookieJar.Cookie();
+			const _cookie = new CookieJar.Cookie();
 			_cookie.name = cookie.trim();
 			_cookie.value = (value ?? "").trim();
 
-			for(var [i, key, value] of iterate(options)) {
+			for(const [i, key, value] of iterate(options)) {
 				if(value == true) _cookie.flags.push(key);
 				else if(value == false) _cookie.flags.splice(_cookie.flags.indexOf(key), 1);
 				else _cookie.props[CookieJar.Cookie.formatKeyword(key) || key] = value;
@@ -893,27 +895,27 @@ class CookieJar {
 		}
 
 		if(typeof cookie == "object") {
-			var cookieString = cookie?.headers?.cookie;
-			var header = cookie?.headers?.raw?.()?.["set-cookie"];
-			var jsonObject = Object.keys(cookie) == "cookies" ? cookie.cookies : null;
+			const cookieString = cookie?.headers?.cookie;
+			const header = cookie?.headers?.raw?.()?.["set-cookie"];
+			const jsonObject = Object.keys(cookie) == "cookies" ? cookie.cookies : null;
 
 			//Set by Request object
 			if(cookieString) {
-				var cookieStringArray = cookieString.split(";");
-				var cookies = CookieJar.Cookie.parse(cookieStringArray);
+				const cookieStringArray = cookieString.split(";");
+				const cookies = CookieJar.Cookie.parse(cookieStringArray);
 				this._addCookiesToJar(...cookies);
 			}
 
 			//Set by Response object
 			if(header) {
-				var cookies = CookieJar.Cookie.parse(header);
+				const cookies = CookieJar.Cookie.parse(header);
 				this._addCookiesToJar(...cookies);
 			}
 
 			//Set by JSON object
 			if(jsonObject) {
-				for(var cookieObject of jsonObject) {
-					var _cookie = new CookieJar.Cookie();
+				for(const cookieObject of jsonObject) {
+					const _cookie = new CookieJar.Cookie();
 					_cookie.name = cookieObject.name;
 					_cookie.value = cookieObject.value;
 					_cookie.props = cookieObject.props;
@@ -947,12 +949,12 @@ class CookieJar {
 	 * @memberof CookieJar
 	 */
 	deleteCookie(cookie) {
-		var _cookie = null;
+		let _cookie = null;
 		if(typeof cookie === "string") _cookie = this.getCookie(cookie);
 		else if(cookie instanceof CookieJar.Cookie) _cookie = cookie;
 		else throw new TypeError("Invalid cookie: " + cookie);
 
-		var id = this.cookies.indexOf(_cookie);
+		const id = this.cookies.indexOf(_cookie);
 		if(id < 0 || !_cookie) return false;
 		else this.cookies.splice(id, 1);
 		return _cookie;
@@ -1009,7 +1011,7 @@ class CookieJar {
 	 * @memberof CookieJar
 	 */
 	_addCookiesToJar(...cookies) {
-		for(var cookie of cookies) {
+		for(const cookie of cookies) {
 			this.deleteCookie(cookie.name);
 			this.cookies.push(cookie);
 		}
@@ -1021,7 +1023,7 @@ class CookieJar {
 	 * @memberof CookieJar
 	 */
 	_removeExpiredCookies() {
-		for(var cookie of this.cookies) {
+		for(const cookie of this.cookies) {
 			if(cookie.props["Expires"] && new Date(cookie.props["Expires"]) < new Date()) this.deleteCookie(cookie);
 		}
 	}
@@ -1061,16 +1063,16 @@ CookieJar.Cookie = class Cookie {
 	 * @returns {string} Cookie String
 	 */
 	toString(full = true) {
-		var head = `${this.name}=${this.value}; `;
-		var props = this.props.reduce((prev, {key, value}) => prev + `${key}=${value}; `, "");
-		var flags = this.flags.join("; ");
+		const head = `${this.name}=${this.value}; `;
+		const props = this.props.reduce((prev, {key, value}) => prev + `${key}=${value}; `, "");
+		const flags = this.flags.join("; ");
 
 		return full ? (head + props + flags + (flags ? "; " : "")) : head;
 	}
 
 	static keywords = ["Expires", "Max-Age", "Domain", "Path", "Secure", "HttpOnly", "SameSite"];
 	static formatKeyword(key) {
-		for(var keyword of this.keywords) {
+		for(const keyword of this.keywords) {
 			if(keyword.toLowerCase() == key.toLowerCase()) return keyword;
 		}
 		return false;
@@ -1078,13 +1080,13 @@ CookieJar.Cookie = class Cookie {
 
 	static parse(cookieStringArray) {
 		return cookieStringArray.map(cookieString => {
-			var cookie = new CookieJar.Cookie();
-			var properties = cookieString.split(/;\s*/);
+			const cookie = new CookieJar.Cookie();
+			const properties = cookieString.split(/;\s*/);
 
-			for(var property of properties) {
+			for(const property of properties) {
 				if(!property) continue;
 
-				var {key, value, flag} = property.match(/(?:(?<key>.*?)=(?<value>.*)|(?<flag>.*))/)?.groups || {};
+				const {key, value, flag} = property.match(/(?:(?<key>.*?)=(?<value>.*)|(?<flag>.*))/)?.groups || {};
 
 				if(key) {
 					if(!cookie.name && !cookie.value) {
@@ -1210,7 +1212,7 @@ Server.on("/request", e => {
 	const {req, res, method} = e;
 
 	//Get cookies from request object
-	var cookies = new CookieJar(req);
+	const cookies = new CookieJar(req);
 
 	//If there is no 'session' cookie, send error with 401 status code
 	if(!cookies.getCookie("session") && method == "GET")
@@ -1219,7 +1221,7 @@ Server.on("/request", e => {
 	//Handle GET method
 	e.get(query => {
 		//Get value of 'session' cookie
-		var session = cookies.getCookie("session").value;
+		const session = cookies.getCookie("session").value;
 
 		//Check database if the session token is valid
 		if(session == "T0yS2KoavK59Xy5y7YXc87nQ") {
