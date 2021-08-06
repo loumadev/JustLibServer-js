@@ -623,22 +623,31 @@ class RequestEvent extends EventListener.Event {
 		if(this.req.method == "POST") {
 			if(this.autoPrevent) this.defaultPrevented = true;
 
-			var buffer = Buffer.alloc(0);
+			const chunks = [];
+
 			this.req.on("data", chunk => {
-				buffer = Buffer.concat([buffer, chunk]);
+				chunks.push(chunk);
 			});
+
 			this.req.on("end", () => {
-				var body = buffer.toString();
+				const buffer = Buffer.concat(chunks);
+				let body = buffer;
+
 				if(type == "json") {
 					try {
 						body = JSON.parse(body);
 					} catch(e) {
 						body = undefined;
 					}
-				} else if(type == "form") body = getQueryParameters(body);
+				} else if(type == "form") {
+					body = getQueryParameters(body);
+				} else if(type == "text") {
+					body = buffer.toString();
+				}
 
 				callback(body, buffer);
 			});
+
 			return true;
 		} else return false;
 	}
