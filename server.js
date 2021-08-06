@@ -1067,7 +1067,7 @@ CookieJar.Cookie = class Cookie {
 		const props = this.props.reduce((prev, {key, value}) => prev + `${key}=${value}; `, "");
 		const flags = this.flags.join("; ");
 
-		return full ? (head + props + flags + (flags ? "; " : "")) : head;
+		return full ? `${head}${props}${flags ? `${flags}; ` : ""}` : head;
 	}
 
 	static keywords = ["Expires", "Max-Age", "Domain", "Path", "Secure", "HttpOnly", "SameSite"];
