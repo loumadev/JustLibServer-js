@@ -620,7 +620,7 @@ class RequestEvent extends EventListener.Event {
 		if(typeof callback !== "function") throw new TypeError("'callback' parameter is not type of function");
 
 		if(!type) {
-			const contentType = this.headers["content-type"];
+			const contentType = this.headers["content-type"] || "";
 
 			if(contentType.indexOf("application/json") != -1) type = "json";
 			else if(contentType.indexOf("application/x-www-form-urlencoded") != -1) type = "form";
@@ -643,12 +643,12 @@ class RequestEvent extends EventListener.Event {
 
 				if(type == "json") {
 					try {
-						body = JSON.parse(body);
+						body = JSON.parse(buffer.toString());
 					} catch(e) {
 						body = null;
 					}
 				} else if(type == "form") {
-					body = getQueryParameters(body);
+					body = getQueryParameters(buffer.toString());
 				} else if(type == "text") {
 					body = buffer.toString();
 				} else if(type == "raw") {
