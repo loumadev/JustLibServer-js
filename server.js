@@ -193,7 +193,9 @@ class Server extends EventListenerStatic {
 		process.exit(code);
 	}
 
-	static _handleRequest(req, res, redirectTo = null) {
+	static _handleRequest(req, res, redirectTo = null, prevEvent = null) {
+		if(redirectTo && !prevEvent) throw new TypeError("Cannot redirect request if there is no RequestEvent provided");
+
 		//TODO: Add error handling
 		//TODO: Add error event (ability to send custom 500 Internal Server Error)
 		const RemoteIP = req.connection.remoteAddress.split(":")[3];
@@ -216,7 +218,9 @@ class Server extends EventListenerStatic {
 
 		//Request handling
 		let destinationPath = redirectTo || URL.pathname;
-		const EventObject = new /*this.*/RequestEvent({
+
+		/** @type {RequestEvent} */
+		const EventObject = prevEvent || new RequestEvent({
 			req,
 			res,
 			method: req.method,
@@ -233,9 +237,22 @@ class Server extends EventListenerStatic {
 			defaultPreventable: true,
 			autoPrevent: true,
 			headers: req.headers,
-			isRedirected: !!redirectTo,
-			redirectedFrom: URL.pathname
+			isRedirected: false,
+			redirectChain: [destinationPath]
 		});
+
+		//Updated properties from previous request event
+		if(redirectTo) {
+			EventObject.redirectChain.push(destinationPath);
+			EventObject.isRedirected = true;
+			EventObject.path = destinationPath;
+			EventObject.Path = destinationPath; /* Deprecated */
+
+			//Reset `Event`'s internal properties
+			EventObject.isStopped = false;
+			EventObject.hasListener = false;
+			EventObject.defaultPrevented = false;
+		}
 
 		//Fix destination path ending with "/"
 		if(destinationPath.length > 1 && destinationPath.endsWith("/")) destinationPath = destinationPath.slice(0, -1);
@@ -597,9 +614,9 @@ class RequestEvent extends EventListener.Event {
 		this.isRedirected;
 
 		/**
-		 * @type {string} Root destination path of redirect chain
+		 * @type {string[]} Array of redirected paths
 		 */
-		this.redirectedFrom;
+		this.redirectChain;
 
 		/**
 		 * @type {boolean} `true` if the request body was successfully received and parsed
@@ -607,14 +624,14 @@ class RequestEvent extends EventListener.Event {
 		this.isBodyReceived = false;
 
 		/**
-		 * @type {any} Parsed body data
-		 */
-		this.body = undefined;
-
-		/**
 		 * @type {Buffer} Received body raw buffer
 		 */
 		this.bodyRaw = undefined;
+
+		/**
+		 * @type {any} Parsed body data
+		 */
+		this.body = undefined;
 	}
 
 	// eslint-disable-next-line valid-jsdoc
@@ -657,6 +674,10 @@ class RequestEvent extends EventListener.Event {
 
 		if(this.req.method == "POST") {
 			if(this.autoPrevent) this.defaultPrevented = true;
+
+			if(this.isBodyReceived) {
+				callback(this.body, this.bodyRaw);
+			}
 
 			const chunks = [];
 
@@ -712,7 +733,7 @@ class RequestEvent extends EventListener.Event {
 		this.preventDefault();
 		this.stopPropagation();
 
-		Server._handleRequest(this.req, this.res, destination);
+		Server._handleRequest(this.req, this.res, destination, this);
 	}
 
 	/**
