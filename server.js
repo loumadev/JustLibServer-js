@@ -232,7 +232,9 @@ class Server extends EventListenerStatic {
 			IS_TRUSTED,
 			defaultPreventable: true,
 			autoPrevent: true,
-			headers: req.headers
+			headers: req.headers,
+			isRedirected: !!redirectTo,
+			redirectedFrom: URL.pathname
 		});
 
 		//Fix destination path ending with "/"
@@ -588,6 +590,16 @@ class RequestEvent extends EventListener.Event {
 		 * @type {http.IncomingHttpHeaders} HTTP headers sent by the client
 		 */
 		this.headers;
+
+		/**
+		 * @type {boolean} Determines if the request was redirected
+		 */
+		this.isRedirected;
+
+		/**
+		 * @type {string} Root destination path of redirect chain
+		 */
+		this.redirectedFrom;
 	}
 
 	// eslint-disable-next-line valid-jsdoc
