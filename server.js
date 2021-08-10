@@ -600,6 +600,21 @@ class RequestEvent extends EventListener.Event {
 		 * @type {string} Root destination path of redirect chain
 		 */
 		this.redirectedFrom;
+
+		/**
+		 * @type {boolean} `true` if the request body was successfully received and parsed
+		 */
+		this.isBodyReceived = false;
+
+		/**
+		 * @type {any} Parsed body data
+		 */
+		this.body = undefined;
+
+		/**
+		 * @type {Buffer} Received body raw buffer
+		 */
+		this.bodyRaw = undefined;
 	}
 
 	// eslint-disable-next-line valid-jsdoc
@@ -668,6 +683,10 @@ class RequestEvent extends EventListener.Event {
 				} else {
 					throw new TypeError(`'${type}' is invalid content type`);
 				}
+
+				this.body = body;
+				this.bodyRaw = buffer;
+				this.isBodyReceived = true;
 
 				callback(body, buffer);
 			});
