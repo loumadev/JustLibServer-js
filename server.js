@@ -17,6 +17,8 @@ const PATH = {
 	PUBLIC: __dirname + "/public/"
 };
 
+//TODO: Replace status numbers with `Server.STATUS` enum
+
 /**
  * @typedef {Object} Credentials
  * @prop {string} username
@@ -1246,6 +1248,11 @@ Server.on("/", e => {
 //Handle simple request
 Server.on("/hello", e => {
 	e.send("Hey!");
+});
+
+//Handle 404 Not Found
+Server.on("404", e => {
+	e.send("There's nothing you see here :(");
 });
 
 //Handle dynamic request
