@@ -774,10 +774,10 @@ class RequestEvent extends EventListener.Event {
 		const bearer = auth?.match(/Bearer ([A-Za-z0-9+\/=\-_.~]*)/)?.[1];
 
 		const forceLogin = callback !== false;
-		const hasCallback = callback !== null;
+		const hasCallback = forceLogin && callback !== null;
 
 		//Handle callback type
-		if(hasCallback && forceLogin && typeof callback !== "function") throw new TypeError(`Callback '${callback}' is not type of function or null`);
+		if(hasCallback && typeof callback !== "function") throw new TypeError(`Callback '${callback}' is not type of function or null`);
 
 		//No auth header
 		if(!auth && (!basic || !bearer)) {
