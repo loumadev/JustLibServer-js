@@ -59,7 +59,8 @@ class Server extends EventListenerStatic {
 				((event: string, listener: (event: RequestEvent) => void) => EventListener.Listener) &
 				((event: 'request', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
 				((event: 'load', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
-				((event: 'unload', listener: (event: EventListener.Event) => void) => EventListener.Listener)
+				((event: 'unload', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
+				((event: '404', listener: (event: EventListener.Event) => void) => EventListener.Listener)
 			}
 		 */
 		this.on;
@@ -304,10 +305,21 @@ class Server extends EventListenerStatic {
 			try {
 				EventObject.streamFile(path.join(PATH.PUBLIC, destinationPath.slice(1)));
 			} catch(err) {
-				//TODO: Add not found event (ability to send custom 404 Not Found)
-				EventObject.send("404 Not Found", 404);
+				this._handleNotFound(EventObject);
 			}
 		}
+	}
+
+	/**
+	 *
+	 * @static
+	 * @param {RequestEvent} event
+	 * @memberof Server
+	 */
+	static _handleNotFound(event) {
+		this.dispatchEvent("404", event, () => {
+			event.send("404 Not Found", 404);
+		});
 	}
 
 	static readRangeHeader(req, totalLength) {
@@ -860,8 +872,7 @@ class RequestEvent extends EventListener.Event {
 
 		const stat = await fs.promises.stat(filePath).catch(() => { });
 		if(!stat || stat.isDirectory()) {
-			Send(this.res, "404 Not Found", status = 404);
-			Server._connectionLog(status);
+			Server._handleNotFound(this);
 			return false;
 		}
 
@@ -886,7 +897,12 @@ class RequestEvent extends EventListener.Event {
 
 		let status = 0;
 		const contentType = getContentType(filePath);
-		const stat = await fs.promises.stat(filePath).catch(() => { }); if(!stat || stat.isDirectory()) return Send(this.res, "404 Not Found", status = 404), Server._connectionLog(status), false;
+		const stat = await fs.promises.stat(filePath).catch(() => { });
+		if(!stat || stat.isDirectory()) {
+			Server._handleNotFound(this);
+			return false;
+		}
+
 		const range = Server.readRangeHeader(this.req, stat.size);
 
 		if(!range) {
