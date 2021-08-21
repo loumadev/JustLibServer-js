@@ -854,10 +854,35 @@ class RequestEvent extends EventListener.Event {
 
 		if(!this.res.writableEnded) {
 			//Send data
+			//TODO: Move `Send` content here
+			//TODO: Switch from calling `Send` to calling `this.send` in internal methods
 			Send(this.res, data, status, contentType, headers);
 			Server._connectionLog(status);
 		} else Server.warn(`Failed to write response after end. ('e.send()'/'e.streamFile()' might be called multiple times)`);
 		//TODO: Add more info to the warning (create separate method + include stack trace)
+	}
+
+	/**
+	 * @typedef {Object} SendOptions
+	 * @prop {string | Object<string, any> | Buffer | ReadableStream} data 
+	 * @prop {number} [status=200] 
+	 * @prop {string} [contentType="text/plain"] 
+	 * @prop {http.OutgoingHttpHeaders} [headers={}] 
+	 */
+
+	/**
+	 * Equivalent of `RequestEvent.send` but with single parameter - an object of options
+	 * @param {SendOptions} options
+	 * @memberof RequestEvent
+	 */
+	sendOptions(options) {
+		const {
+			data,
+			status = 200,
+			contentType = "text/plain",
+			headers = {}
+		} = options;
+		this.send(data, status, contentType, headers);
 	}
 
 	/**
