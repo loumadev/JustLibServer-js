@@ -203,6 +203,7 @@ class Server extends EventListenerStatic {
 		//TODO: Add error event (ability to send custom 500 Internal Server Error)
 		const RemoteIP = req.connection.remoteAddress.split(":")[3];
 		const ProxyIP = req.headers["x-forwarded-for"];
+		const protocol = req.headers["x-forwarded-proto"] || `http${req.secure ? "s" : ""}`;
 		const HOST = req.headers["host"];
 		const IP = ProxyIP || RemoteIP;
 		const URL = url.parse(req.url, true);
@@ -232,7 +233,7 @@ class Server extends EventListenerStatic {
 			IP,
 			host: (HOST || ""),
 			HOST: (HOST || ""), /* Deprecated */
-			origin: `http${req.secure ? "s" : ""}://${req.headers.host}`,
+			protocol,
 			path: destinationPath,
 			Path: destinationPath, /* Deprecated */
 			query: URL.query,
@@ -579,6 +580,12 @@ class RequestEvent extends EventListener.Event {
 		 * @type {string} Request host
 		 */
 		this.HOST;
+
+		/**
+		 * @type {string} Request protocol
+		 * @example "http" or "https"
+		 */
+		this.protocol;
 
 		/**
 		 * @type {string} Request origin
