@@ -321,7 +321,7 @@ class Server extends EventListenerStatic {
 	 * @memberof Server
 	 */
 	static _handleNotFound(event) {
-		this.dispatchEvent("404", event, () => {
+		this.dispatchEvent("404", event.clone(), () => {
 			event.send("404 Not Found", 404);
 		});
 	}
@@ -973,6 +973,18 @@ class RequestEvent extends EventListener.Event {
 	 */
 	setHeader(name, value) {
 		this.res.setHeader(name, value);
+	}
+
+	/**
+	 * Clones current RequestEvent object and creates new one
+	 * @return {RequestEvent} 
+	 * @memberof RequestEvent
+	 */
+	clone() {
+		const event = new RequestEvent(this);
+		event.reset();
+
+		return event;
 	}
 }
 
