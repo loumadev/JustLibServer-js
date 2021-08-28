@@ -233,6 +233,7 @@ class Server extends EventListenerStatic {
 			IP,
 			host: (HOST || ""),
 			HOST: (HOST || ""), /* Deprecated */
+			origin: `${protocol}://${req.headers.host}`,
 			protocol,
 			path: destinationPath,
 			Path: destinationPath, /* Deprecated */
