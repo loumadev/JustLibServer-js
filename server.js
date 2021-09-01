@@ -500,6 +500,33 @@ class Server extends EventListenerStatic {
 		return formatted;
 	}
 
+	/**
+	 * Formats array of any type into human readable, console printable string 
+	 * @static
+	 * @param {any[]} args
+	 * @param {util.InspectOptions} options
+	 * @returns {string}
+	 * @memberof Server
+	 */
+	static formatArguments(args, options = {
+		colors: true,
+		depth: 4
+	}) {
+		const params = [];
+		const format = args.map(arg => {
+			if(typeof arg === "string") {
+				if(options.colors) return this.formatMessage(arg);
+				else return arg.replace(/§[0-9a-f]/g, "");
+			} else {
+				params.push(arg);
+				return "%O";
+			}
+		}).join(" ");
+		const message = util.formatWithOptions(options, format, ...params);
+
+		return message;
+	}
+
 	static formatTime(d = new Date()) {
 		return `[${fixDigits(d.getHours())}:${fixDigits(d.getMinutes())}:${fixDigits(d.getSeconds())}]`;
 	}
@@ -511,22 +538,25 @@ class Server extends EventListenerStatic {
 
 	static log(...args) {
 		if(!this.stdio.settings.logs) return false;
-		console.log(`${this.formatTime()} ${args.map(e => this.formatMessage(e)).join(" ")}`);
+
+		const formattedArgs = this.formatArguments(args, {colors: true, depth: 4});
+		const message = `${this.formatTime()} ${formattedArgs}`;
+		console.log(message);
 	}
 
 	static warn(...args) {
 		if(!this.stdio.settings.warnings) return false;
-		const params = [];
-		const format = args.map(arg => typeof arg === "string" ? arg : (params.push(arg), "%O")).join(" ");
-		const message = util.formatWithOptions({colors: false, depth: 4}, `\x1b[33m${this.formatTime()} [WARN]: ${format}\x1b[0m`, ...params);
+
+		const formattedArgs = this.formatArguments(args, {colors: false, depth: 4});
+		const message = `\x1b[33m${this.formatTime()} [WARN]: ${formattedArgs}\x1b[0m`;
 		console.warn(message);
 	}
 
 	static error(...args) {
 		if(!this.stdio.settings.errors) return false;
-		const params = [];
-		const format = args.map(arg => typeof arg === "string" ? arg : (params.push(arg), "%O")).join(" ");
-		const message = util.formatWithOptions({colors: false, depth: 4}, `\x1b[31m${this.formatTime()} [ERROR]: ${format}\x1b[0m`, ...params);
+
+		const formattedArgs = this.formatArguments(args, {colors: false, depth: 4});
+		const message = `\x1b[31m${this.formatTime()} [ERROR]: ${formattedArgs}\x1b[0m`;
 		console.error(message);
 	}
 }
