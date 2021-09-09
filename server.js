@@ -636,7 +636,7 @@ class RequestEvent extends EventListener.Event {
 		this.Path;
 
 		/**
-		 * @type {Object<string, any>} Request query string parameters object
+		 * @type {Object<string, string>} Request query string parameters object
 		 */
 		this.query;
 
