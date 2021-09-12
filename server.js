@@ -689,7 +689,7 @@ class RequestEvent extends EventListener.Event {
 	// eslint-disable-next-line valid-jsdoc
 	/**
 	 * Handles GET method
-	 * @param {(query: Object<string, any>) => void} callback Request callback function
+	 * @param {(query: Object<string, string>) => void} callback Request callback function
 	 * @returns {boolean} True if request was successfully handled, otherwise false
 	 * @memberof RequestEvent
 	 */
