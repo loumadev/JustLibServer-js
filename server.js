@@ -59,10 +59,10 @@ class Server extends EventListenerStatic {
 		/**
 		 * @type {
 				((event: string, listener: (event: RequestEvent) => void) => EventListener.Listener) &
-				((event: 'request', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
+				((event: 'request', listener: (event: RequestEvent) => void) => EventListener.Listener) &
 				((event: 'load', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
 				((event: 'unload', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
-				((event: '404', listener: (event: EventListener.Event) => void) => EventListener.Listener)
+				((event: '404', listener: (event: RequestEvent) => void) => EventListener.Listener)
 			}
 		 */
 		this.on;
