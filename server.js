@@ -1642,11 +1642,11 @@ function encrypt(str, strength, uri = false) {
 	var fixedRange = unescape(encodeURIComponent(chars));
 	var hash = btoa(fixedRange);
 
-	return uri ? hash.replace(/\+/g, ".").replace(/\//g, "_").replace(/=/g, "-") : hash;
+	return uri ? encodeURIComponent(hash) : hash;
 }
 
 function decrypt(hash, strength) {
-	var fixedRange = atob(hash.replace(/\./g, "+").replace(/_/g, "/").replace(/-/g, "="));
+	var fixedRange = atob(decodeURIComponent(hash));
 	var chars = decodeURIComponent(escape(fixedRange));
 	var codes = [];
 	strength %= 256;
