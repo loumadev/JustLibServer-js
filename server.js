@@ -928,7 +928,7 @@ class RequestEvent extends EventListener.Event {
 	 * @param {string} filePath
 	 * @param {number} [status=200]
 	 * @param {http.OutgoingHttpHeaders} [headers={}]
-	 * @returns {boolean}
+	 * @returns {Promise<boolean>}
 	 * @memberof RequestEvent
 	 */
 	async sendFile(filePath, status = 200, headers = {}) {
@@ -953,7 +953,7 @@ class RequestEvent extends EventListener.Event {
 	 * Stream file using partial content response
 	 * @param {string} filePath
 	 * @param {http.OutgoingHttpHeaders} [headers={}]
-	 * @returns {boolean}
+	 * @returns {Promise<boolean>}
 	 * @memberof RequestEvent
 	 */
 	async streamFile(filePath, headers = {}) {
