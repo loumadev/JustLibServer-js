@@ -1680,4 +1680,4 @@ module.exports = {
 	getFileFormat
 };
 
-Server.begin();
+if(require.main === module) Server.begin();
