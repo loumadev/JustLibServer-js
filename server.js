@@ -19,13 +19,13 @@ const PATH = {
 
 //TODO: Replace status numbers with `Server.STATUS` enum
 
-/**
- * @typedef {Object} Credentials
- * @prop {string} username
- * @prop {string} password
- */
-
 class Server extends EventListenerStatic {
+	/**
+	 * @typedef {Object} Credentials
+	 * @prop {string} username
+	 * @prop {string} password
+	 */
+
 	static title = null;
 	static modules = {};
 	/**
@@ -66,6 +66,21 @@ class Server extends EventListenerStatic {
 			}
 		 */
 		this.on;
+
+		// const _originalListener = this.on;
+		// this.on = (...args) => {
+		// 	let type = args[0];
+		// 	let middlewares = args[1];
+		// 	let callback = args[2];
+
+		// 	if(!callback && typeof middlewares === "function") callback = middlewares;
+		// 	else if(callback && typeof middlewares === "function") middlewares = [middlewares];
+		// 	else if(!callback) throw new TypeError("Invalid callback " + callback);
+		// 	else if(!(middlewares instanceof Array)) throw new TypeError("Invalid middlewares: " + middlewares);
+
+		// 	const listener = _originalListener(type, callback);
+		// 	listener.middlewares = middlewares;
+		// };
 
 		//Set up error logging
 		process.on("unhandledRejection", (reason, promise) => {
@@ -567,6 +582,22 @@ class Server extends EventListenerStatic {
  * @extends {EventListener.Event}
  */
 class RequestEvent extends EventListener.Event {
+	/**
+	 * @typedef {(event: RequestEvent, next: Function) => void} MiddlewareCallback
+	 */
+
+	/**
+	 * @typedef {(query: Object<string, string>) => void} RequestCallbackGET
+	 */
+
+	/**
+	 * @typedef {
+			((callback: RequestCallbackGET) => boolean) &
+			((middleware: MiddlewareCallback, callback: RequestCallbackGET) => boolean) &
+			((middlewares: MiddlewareCallback[], callback: RequestCallbackGET) => boolean)
+		} RequestHandlerGET
+	 */
+
 	constructor(data) {
 		super(data);
 
@@ -684,22 +715,42 @@ class RequestEvent extends EventListener.Event {
 		 * @type {any} Parsed body data
 		 */
 		this.body = undefined;
+
+
+		/**
+		 * Handles GET method
+		 * @returns {boolean} True if request was successfully handled, otherwise false
+		 * @type {RequestHandlerGET}
+		*/
+		this.get = this.__get;
 	}
 
 	// eslint-disable-next-line valid-jsdoc
 	/**
-	 * Handles GET method
-	 * @param {(query: Object<string, string>) => void} callback Request callback function
-	 * @returns {boolean} True if request was successfully handled, otherwise false
-	 * @memberof RequestEvent
+	 * @private
 	 */
-	get(callback) {
-		if(typeof callback !== "function") throw new TypeError("'callback' parameter is not type of function");
+	__get(middlewares, callback = null) {
+		if(!callback && typeof middlewares === "function") { // f(callback)
+			callback = middlewares;
+			middlewares = [];
+		}
+		else if(callback && typeof middlewares === "function") middlewares = [middlewares]; // f(middleware, callback)
+		else if(!callback) throw new TypeError("'callback' parameter is not type of function");
+		else if(!(middlewares instanceof Array)) throw new TypeError("'middlewares' parameter is not type of function[]");
+
+		const executor = (middlewares, i = 0) => {
+			return () => {
+				if(i == middlewares.length) callback(this);
+				else middlewares[i](this, executor(middlewares, i + 1));
+			};
+		};
 
 		if(this.req.method == "GET") {
 			if(this.autoPrevent) this.defaultPrevented = true;
 
-			callback(this.query);
+			if(!middlewares.length) callback(this.query);
+			else executor(middlewares)();
+
 			return true;
 		} else return false;
 	}
