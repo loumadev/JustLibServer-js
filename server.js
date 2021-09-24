@@ -209,10 +209,14 @@ class Server extends EventListenerStatic {
 
 	static stop(code = 0, force = false) {
 		this.log("§cStopping server...");
+
 		this.isStopping = true;
 		this._saveBlacklist();
+
 		this.dispatchEvent("unload", {forced: force});
-		process.exit(code);
+
+		if(force) process.exit(code);
+		else process.exitCode = 1;
 	}
 
 	static _handleRequest(req, res, redirectTo = null, prevEvent = null) {
