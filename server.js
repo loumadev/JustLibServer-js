@@ -55,6 +55,8 @@ class Server extends EventListenerStatic {
 	static BLACKLIST = [];
 	static PATH = PATH;
 
+	static isStopping = false;
+
 	static begin() {
 		/**
 		 * @type {
@@ -108,7 +110,8 @@ class Server extends EventListenerStatic {
 				const {input, command, args} = e;
 
 				if(command == "stop") {
-					this.stop();
+					const isForced = args[0] == "force";
+					this.stop(0, isForced);
 				} else if(command == "help") {
 					this.log("§eCommands:\n§bStop §f- §aStop server\n§bHelp §f- §aShow this menu");
 				} else if(command == "clear") {
@@ -204,10 +207,11 @@ class Server extends EventListenerStatic {
 		} else this.log(`§7Initialization done (§ftook ${new Date() - startDate}ms§7)`);
 	}
 
-	static stop(code = 0) {
+	static stop(code = 0, force = false) {
 		this.log("§cStopping server...");
+		this.isStopping = true;
 		this._saveBlacklist();
-		this.dispatchEvent("unload");
+		this.dispatchEvent("unload", {forced: force});
 		process.exit(code);
 	}
 
