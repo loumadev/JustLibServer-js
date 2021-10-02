@@ -752,7 +752,7 @@ class RequestEvent extends EventListener.Event {
 
 		const executor = (middlewares, i = 0) => {
 			return () => {
-				if(i == middlewares.length) callback(this);
+				if(i == middlewares.length) callback(this.query);
 				else middlewares[i](this, executor(middlewares, i + 1));
 			};
 		};
