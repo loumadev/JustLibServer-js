@@ -723,6 +723,11 @@ class RequestEvent extends EventListener.Event {
 		 */
 		this.body = undefined;
 
+		/**
+		 * @type {Object<string, any>} Represents custom data object. Could be used in the middlewares to transfer data into event handlers.
+		 */
+		this.data = {};
+
 
 		/**
 		 * Handles GET method
