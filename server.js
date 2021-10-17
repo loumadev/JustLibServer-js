@@ -1094,9 +1094,9 @@ class CookieJar {
 
 	/**
 	 * Adds cookie to the Jar
-	 * @param {string|CookieJar.Cookie|http.ServerResponse} cookie Cookie name (requires second parameter), Cookie String, CookieJar.Cookie object, ServerResponseLike object
+	 * @param {string | CookieJar.Cookie | http.ServerResponse} cookie Cookie name (requires second parameter), Cookie String, CookieJar.Cookie object, ServerResponseLike object
 	 * @param {string} [value=undefined]
-	 * @param {Object<string,any>} [options={}]
+	 * @param {Object<string, any>} [options={}]
 	 * @returns {CookieJar}
 	 * @memberof CookieJar
 	 */
@@ -1163,17 +1163,18 @@ class CookieJar {
 	/**
 	 * Returns cookie object found by name
 	 * @param {string} name Cookie name
+	 * @param {boolean} [expired=true] Include expired cookies
 	 * @returns {CookieJar.Cookie} Cookie object if found, otherwise undefined
 	 * @memberof CookieJar
 	 */
-	getCookie(name) {
-		this._removeExpiredCookies();
-		return this.cookies.find(cookie => cookie.name == name);
+	getCookie(name, expired = true) {
+		const cookies = this.getCookies(expired);
+		return cookies.find(cookie => cookie.name == name);
 	}
 
 	/**
 	 * Removes cookie from the Jar
-	 * @param {string|CookieJar.Cookie} cookie
+	 * @param {string | CookieJar.Cookie} cookie
 	 * @returns {CookieJar.Cookie} Deleted cookie
 	 * @memberof CookieJar
 	 */
@@ -1193,45 +1194,77 @@ class CookieJar {
 	 * Sends header with cookies
 	 * @param {http.ServerResponse} response Server response object
 	 * @param {boolean} [full=true] Include cookie properties and flags
+	 * @param {boolean} [expired=full] Include expired cookies
 	 * @returns {CookieJar.Cookie}
 	 * @memberof CookieJar
 	 */
-	sendCookies(response, full = true) {
-		this._removeExpiredCookies();
-		response.setHeader("Set-Cookie", this.cookies.map(e => e.toString(full)));
+	sendCookies(response, full = true, expired = full) {
+		const cookies = this.getCookies(expired).map(e => e.toString(full));
+		response.setHeader("Set-Cookie", cookies);
 		return this;
 	}
 
 	/**
 	 * Converts Cookie object to cookie string
 	 * @param {boolean} [full=true] Include cookie properties and flags
+	 * @param {boolean} [expired=full] Include expired cookies
 	 * @returns {string} Cookie String
 	 * @memberof CookieJar
 	 */
-	toString(full = true) {
-		this._removeExpiredCookies();
-		return this.cookies.map(e => e.toString(full)).join("");
+	toString(full = true, expired = full) {
+		const cookies = this.getCookies(expired).map(e => e.toString(full));
+		return cookies.join("");
 	}
 
 	/**
 	 * Checks if the Jar is empty
+	 * @param {boolean} [expired=true] Include expired cookies
 	 * @returns {boolean} true if Jar is empty, otherwise false
 	 * @memberof CookieJar
 	 */
-	isEmpty() {
-		this._removeExpiredCookies();
-		return this.cookies.length == 0;
+	isEmpty(expired = true) {
+		const cookies = this.getCookies(expired);
+		return cookies.length == 0;
 	}
 
 	/**
 	 * Checks if the Jar contains cookie with certain name
 	 * @param {string} name Cookie name
+	 * @param {boolean} [expired=true] Include expired cookies
 	 * @returns {boolean} true if Jar contains cookie with certain name, otherwise false
 	 * @memberof CookieJar
 	 */
-	includes(name) {
-		this._removeExpiredCookies();
-		return !!this.getCookie(name);
+	includes(name, expired = true) {
+		return !!this.getCookie(name, expired);
+	}
+
+	/**
+	 * Removes expired cookies from the Jar
+	 * @memberof CookieJar
+	 */
+	removeExpiredCookies() {
+		for(const cookie of this.cookies) {
+			if(cookie.isExpired()) this.deleteCookie(cookie);
+		}
+	}
+
+	/**
+	 * Return unexpired cookies form the jar
+	 * @returns {CookieJar.Cookie[]}
+	 * @memberof CookieJar
+	 */
+	getUnexpiredCookies() {
+		return this.cookies.filter(cookie => !cookie.isExpired());
+	}
+
+	/**
+	 * Return cookies in the jar
+	 * @param {boolean} [expired=true] Include expired cookies
+	 * @returns {CookieJar.Cookie[]}
+	 * @memberof CookieJar
+	 */
+	getCookies(expired = true) {
+		return expired ? this.cookies : this.getUnexpiredCookies();
 	}
 
 	/**
@@ -1243,17 +1276,6 @@ class CookieJar {
 		for(const cookie of cookies) {
 			this.deleteCookie(cookie.name);
 			this.cookies.push(cookie);
-		}
-		this._removeExpiredCookies();
-	}
-
-	/**
-	 * Removes expired cookies from the Jar
-	 * @memberof CookieJar
-	 */
-	_removeExpiredCookies() {
-		for(const cookie of this.cookies) {
-			if(cookie.props["Expires"] && new Date(cookie.props["Expires"]) < new Date()) this.deleteCookie(cookie);
 		}
 	}
 }
@@ -1281,7 +1303,7 @@ CookieJar.Cookie = class Cookie {
 		this.props = {};
 
 		/**
-		 * @type {Array<"Secure"|"HttpOnly">}
+		 * @type {Array<"Secure" | "HttpOnly">}
 		 */
 		this.flags = [];
 	}
@@ -1297,6 +1319,10 @@ CookieJar.Cookie = class Cookie {
 		const flags = this.flags.join("; ");
 
 		return full ? `${head}${props}${flags ? `${flags}; ` : ""}` : head;
+	}
+
+	isExpired() {
+		return this.props["Expires"] && new Date(this.props["Expires"]) < new Date();
 	}
 
 	static keywords = ["Expires", "Max-Age", "Domain", "Path", "Secure", "HttpOnly", "SameSite"];
