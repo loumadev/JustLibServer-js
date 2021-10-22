@@ -265,7 +265,8 @@ class Server extends EventListenerStatic {
 			autoPrevent: true,
 			headers: req.headers,
 			isRedirected: false,
-			redirectChain: [destinationPath]
+			redirectChain: [destinationPath],
+			resolvedFile: this.resolvePublicResource(destinationPath)
 		});
 
 		//Updated properties from previous request event
@@ -274,6 +275,7 @@ class Server extends EventListenerStatic {
 			EventObject.isRedirected = true;
 			EventObject.path = destinationPath;
 			EventObject.Path = destinationPath; /* Deprecated */
+			EventObject.resolvedFile = this.resolvePublicResource(destinationPath);
 
 			//Reset `Event`'s internal properties
 			EventObject.isStopped = false;
@@ -329,7 +331,7 @@ class Server extends EventListenerStatic {
 			if(res.writableEnded) return this.warn(`Failed to write response after end. (Default action has not been prevented)`);
 
 			try {
-				EventObject.streamFile(path.join(PATH.PUBLIC, destinationPath.slice(1)));
+				EventObject.streamFile(EventObject.resolvedFile);
 			} catch(err) {
 				this._handleNotFound(EventObject);
 			}
@@ -346,6 +348,10 @@ class Server extends EventListenerStatic {
 		this.dispatchEvent("404", event.clone(), () => {
 			event.send("404 Not Found", 404);
 		});
+	}
+
+	static resolvePublicResource(filePath) {
+		return path.join(PATH.PUBLIC, filePath);
 	}
 
 	static readRangeHeader(req, totalLength) {
@@ -727,6 +733,11 @@ class RequestEvent extends EventListener.Event {
 		 * @type {Object<string, any>} Represents custom data object. Could be used in the middlewares to transfer data into event handlers.
 		 */
 		this.data = {};
+
+		/**
+		 * @type {string} Resolved path to requested file in local file system
+		 */
+		this.resolvedFile;
 
 
 		/**
