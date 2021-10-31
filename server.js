@@ -614,6 +614,19 @@ class RequestEvent extends EventListener.Event {
 	constructor(data) {
 		super(data);
 
+		//To make RequestEvent extend both EventListener.Event and EventListener
+		const listener = new EventListener();
+		Object.assign(this, listener);
+		Object.defineProperties(this.__proto__, Object.getOwnPropertyDescriptors(listener.__proto__));
+
+
+		/**
+		 * @type {
+				((event: string, listener: (event: RequestEvent) => void) => EventListener.Listener) &
+				((event: 'beforesend', listener: (event: EventListener.Event & {responseData: any, responseStatus: number, responseHeaders: http.OutgoingHttpHeaders}) => void) => EventListener.Listener)
+			}
+		 */
+		this.on;
 
 		/**
 		 * @type {http.IncomingMessage} Request object
@@ -970,19 +983,28 @@ class RequestEvent extends EventListener.Event {
 			const isBuffer = data instanceof Buffer;
 			const isStream = !!data.pipe;
 
-			this.res.writeHead(status, {
+			const responseHeaders = {
 				"Content-Type": (isBuffer || isStream) ? contentType : (isObject ? "application/json" : contentType),
 				...headers
+			};
+
+			this.dispatchEvent("beforesend", {
+				responseData: data,
+				responseStatus: status,
+				responseHeaders: responseHeaders
+			}, event => {
+				this.res.writeHead(event.responseStatus, event.responseHeaders);
+
+				if(isStream) {
+					event.responseData.pipe(this.res);
+				} else {
+					this.res.write(isBuffer ? event.responseData : (isObject ? JSON.stringify(event.responseData) : event.responseData + ""));
+					this.res.end();
+				}
+
+				Server._connectionLog(event.responseStatus);
 			});
 
-			if(isStream) {
-				data.pipe(this.res);
-			} else {
-				this.res.write(isBuffer ? data : (isObject ? JSON.stringify(data) : data + ""));
-				this.res.end();
-			}
-
-			Server._connectionLog(status);
 		} else Server.warn(`Failed to write response after end. ('e.send()'/'e.streamFile()' might be called multiple times)`);
 		//TODO: Add more info to the warning (create separate method + include stack trace)
 	}
