@@ -238,7 +238,7 @@ class Server extends EventListenerStatic {
 
 			if(IS_BLACKLISTED) {
 				this.warn(`Received request from blacklisted IP (${IP})`);
-				return Send(res, "403 Forbidden", 403);
+				return this.send("403 Forbidden", 403);
 			}
 		}
 
@@ -955,7 +955,7 @@ class RequestEvent extends EventListener.Event {
 	}
 
 	/**
-	 * Send response (shorthand for 'Send')
+	 * Send response to the client
 	 * @param {string | Object<string, any> | Buffer | ReadableStream} data Data to be sent as response
 	 * @param {number} [status=200] Response status code
 	 * @param {string | "text/plain" | "text/html" | "application/json" | "image/png" | "audio/mpeg" | "video/mp4"} [contentType="text/plain"] Content type of the response
@@ -966,9 +966,22 @@ class RequestEvent extends EventListener.Event {
 
 		if(!this.res.writableEnded) {
 			//Send data
-			//TODO: Move `Send` content here
-			//TODO: Switch from calling `Send` to calling `this.send` in internal methods
-			Send(this.res, data, status, contentType, headers);
+			const isObject = typeof data === "object";
+			const isBuffer = data instanceof Buffer;
+			const isStream = !!data.pipe;
+
+			this.res.writeHead(status, {
+				"Content-Type": (isBuffer || isStream) ? contentType : (isObject ? "application/json" : contentType),
+				...headers
+			});
+
+			if(isStream) {
+				data.pipe(this.res);
+			} else {
+				this.res.write(isBuffer ? data : (isObject ? JSON.stringify(data) : data + ""));
+				this.res.end();
+			}
+
 			Server._connectionLog(status);
 		} else Server.warn(`Failed to write response after end. ('e.send()'/'e.streamFile()' might be called multiple times)`);
 		//TODO: Add more info to the warning (create separate method + include stack trace)
@@ -1018,7 +1031,7 @@ class RequestEvent extends EventListener.Event {
 		headers["Content-Length"] = stat.size;
 
 		//Send file
-		Send(this.res, fs.createReadStream(filePath), status, getContentType(filePath), headers);
+		this.send(fs.createReadStream(filePath), status, getContentType(filePath), headers);
 		Server._connectionLog(status);
 		return true;
 	}
@@ -1046,7 +1059,7 @@ class RequestEvent extends EventListener.Event {
 
 		if(!range) {
 			headers["Content-Length"] = stat.size;
-			Send(this.res, fs.createReadStream(filePath), status = 200, contentType, headers), Server._connectionLog(status);
+			this.send(fs.createReadStream(filePath), status = 200, contentType, headers), Server._connectionLog(status);
 			return true;
 		}
 
@@ -1054,7 +1067,7 @@ class RequestEvent extends EventListener.Event {
 		if(range.start >= stat.size || range.end >= stat.size) {
 			//Send correct range
 			headers["Content-Range"] = `bytes */${stat.size}`;
-			Send(this.res, "416 Range Not Satisfiable", status = 416, contentType, headers);
+			this.send("416 Range Not Satisfiable", status = 416, contentType, headers);
 		} else {
 			//Set up headers
 			headers["Content-Range"] = `bytes ${range.start}-${range.end}/${stat.size}`;
@@ -1063,7 +1076,7 @@ class RequestEvent extends EventListener.Event {
 			//headers["Cache-Control"] = "no-cache";
 
 			//Send part of file
-			Send(this.res, fs.createReadStream(filePath, range), status = 206, contentType, headers);
+			this.send(fs.createReadStream(filePath, range), status = 206, contentType, headers);
 		}
 		Server._connectionLog(status);
 		return true;
@@ -1679,6 +1692,14 @@ function writeFileAsync(path, data, ...options) {
 	});
 }
 
+/**
+ * @deprecated Use `RequestEvent.send(...)` instead
+ * @param {*} res
+ * @param {*} data
+ * @param {number} [status=200]
+ * @param {string} [type="text/plain"]
+ * @param {*} [headers={}]
+ */
 function Send(res, data, status = 200, type = "text/plain", headers = {}) {
 	const isObject = typeof data === "object";
 	const isBuffer = data instanceof Buffer;
