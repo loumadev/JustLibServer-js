@@ -232,16 +232,6 @@ class Server extends EventListenerStatic {
 		const IS_TRUSTED = this.TRUSTED_IPS.map(e => IP.includes(e)).includes(true);
 		const IS_BLACKLISTED = this.BLACKLIST.map(e => IP.includes(e)).includes(true);
 
-		if(!redirectTo) {
-			if(IS_TRUSTED) this.log(`§2Incoming request from ${HOST ? `§2(${HOST})` : ""}§2${RemoteIP}${ProxyIP ? `§3(${ProxyIP})` : ""}§2: §2${req.method} §2${req.url}`);
-			else this.log(`§2Incoming request from ${HOST ? `§2(${HOST})` : ""}§a${RemoteIP}${ProxyIP ? `§b(${ProxyIP})` : ""}§2: §a${req.method} §a${req.url}`);
-
-			if(IS_BLACKLISTED) {
-				this.warn(`Received request from blacklisted IP (${IP})`);
-				return this.send("403 Forbidden", 403);
-			}
-		}
-
 		//Request handling
 		let destinationPath = redirectTo || URL.pathname;
 
@@ -268,6 +258,16 @@ class Server extends EventListenerStatic {
 			redirectChain: [destinationPath],
 			resolvedFile: this.resolvePublicResource(destinationPath)
 		});
+
+		if(!redirectTo) {
+			if(IS_TRUSTED) this.log(`§2Incoming request from ${HOST ? `§2(${HOST})` : ""}§2${RemoteIP}${ProxyIP ? `§3(${ProxyIP})` : ""}§2: §2${req.method} §2${req.url}`);
+			else this.log(`§2Incoming request from ${HOST ? `§2(${HOST})` : ""}§a${RemoteIP}${ProxyIP ? `§b(${ProxyIP})` : ""}§2: §a${req.method} §a${req.url}`);
+
+			if(IS_BLACKLISTED) {
+				this.warn(`Received request from blacklisted IP (${IP})`);
+				return EventObject.send("403 Forbidden", 403);
+			}
+		}
 
 		//Updated properties from previous request event
 		if(redirectTo) {
