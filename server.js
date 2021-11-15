@@ -983,8 +983,10 @@ class RequestEvent extends EventListener.Event {
 			const isBuffer = data instanceof Buffer;
 			const isStream = !!data.pipe;
 
+			const computedContentType = ((isBuffer || isStream) ? contentType : (isObject ? "application/json" : contentType)) || "text/plain";
+
 			const responseHeaders = {
-				"Content-Type": (isBuffer || isStream) ? contentType : (isObject ? "application/json" : contentType),
+				"Content-Type": `${computedContentType}; charset=utf-8`,
 				...headers
 			};
 
