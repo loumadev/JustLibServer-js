@@ -233,7 +233,7 @@ class Server extends EventListenerStatic {
 		const IS_BLACKLISTED = this.BLACKLIST.map(e => IP.includes(e)).includes(true);
 
 		//Request handling
-		let destinationPath = redirectTo || URL.pathname;
+		let destinationPath = decodeURIComponent(redirectTo || URL.pathname);
 
 		/** @type {RequestEvent} */
 		const EventObject = prevEvent || new RequestEvent({
