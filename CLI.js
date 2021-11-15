@@ -8,12 +8,12 @@ class CLI extends EventListener {
 		 * @param {String} event Event name
 		 * @param {Function} callback Event handler
 		 * @type {
-				((event: 'command', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
-				((event: 'input', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
-				((event: 'stdout', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
-				((event: 'stderr', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
-				((event: 'stderr', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
-				((event: 'unknownCommand', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
+				((event: 'command', listener: (event: EventListener.Event & {input: string, command: string, args: string[]}) => void) => EventListener.Listener) &
+				((event: 'input', listener: (event: EventListener.Event & {input: string}) => void) => EventListener.Listener) &
+				((event: 'stdout', listener: (event: EventListener.Event & {data: string, string: string}) => void) => EventListener.Listener) &
+				((event: 'stderr', listener: (event: EventListener.Event & {data: string, string: string}) => void) => EventListener.Listener) &
+				((event: 'stderr', listener: (event: EventListener.Event & {data: string, string: string}) => void) => EventListener.Listener) &
+				((event: 'unknownCommand', listener: (event: EventListener.Event & {input: string, command: string, args: string[]}) => void) => EventListener.Listener) &
 				((event: 'keypress', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
 				((event: 'load', listener: (event: EventListener.Event) => void) => EventListener.Listener)
 			}
