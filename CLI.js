@@ -14,7 +14,7 @@ class CLI extends EventListener {
 				((event: 'stderr', listener: (event: EventListener.Event & {data: string, string: string}) => void) => EventListener.Listener) &
 				((event: 'stderr', listener: (event: EventListener.Event & {data: string, string: string}) => void) => EventListener.Listener) &
 				((event: 'unknownCommand', listener: (event: EventListener.Event & {input: string, command: string, args: string[]}) => void) => EventListener.Listener) &
-				((event: 'keypress', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
+				((event: 'keypress', listener: (event: EventListener.Event & {sequence: string, buffer: string[]}) => void) => EventListener.Listener) &
 				((event: 'load', listener: (event: EventListener.Event) => void) => EventListener.Listener)
 			}
 		*/
@@ -264,7 +264,7 @@ class CLI extends EventListener {
 			this._updateCLI();
 		}
 
-		this.dispatchEvent("keypress");
+		this.dispatchEvent("keypress", {sequence: key, buffer: buffer});
 	}
 }
 
