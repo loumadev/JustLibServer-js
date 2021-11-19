@@ -611,6 +611,26 @@ class RequestEvent extends EventListener.Event {
 		} RequestHandlerGET
 	 */
 
+	/**
+	 * @typedef {
+			((callback: (bodyParsed: string | Object<string, any>, bodyBuffer: Buffer) => void) => boolean) &
+			((callback: (bodyParsed: string, bodyBuffer: Buffer) => void, type: "text") => boolean) &
+			((callback: (bodyParsed: Object<string, any>, bodyBuffer: Buffer) => void, type: "json" | "form") => boolean) &
+			((callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean) &
+		} RequestHandlerPOST
+	 */
+
+	//TODO: Add middlewares support for POST requests
+	// ((middleware: MiddlewareCallback, callback: (bodyParsed: string | Object<string, any>, bodyBuffer: Buffer) => void) => boolean) &
+	// ((middleware: MiddlewareCallback, callback: (bodyParsed: string, bodyBuffer: Buffer) => void, type: "text") => boolean) &
+	// ((middleware: MiddlewareCallback, callback: (bodyParsed: Object<string, any>, bodyBuffer: Buffer) => void, type: "json" | "form") => boolean) &
+	// ((middleware: MiddlewareCallback, callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean) &
+
+	// ((middleware: MiddlewareCallback[], callback: (bodyParsed: string | Object<string, any>, bodyBuffer: Buffer) => void) => boolean) &
+	// ((middleware: MiddlewareCallback[], callback: (bodyParsed: string, bodyBuffer: Buffer) => void, type: "text") => boolean) &
+	// ((middleware: MiddlewareCallback[], callback: (bodyParsed: Object<string, any>, bodyBuffer: Buffer) => void, type: "json" | "form") => boolean) &
+	// ((middleware: MiddlewareCallback[], callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean)
+
 	constructor(data) {
 		super(data);
 
@@ -754,11 +774,18 @@ class RequestEvent extends EventListener.Event {
 
 
 		/**
-		 * Handles GET method
+		 * Handles GET requests
 		 * @returns {boolean} True if request was successfully handled, otherwise false
 		 * @type {RequestHandlerGET}
 		*/
 		this.get = this.__get;
+
+		/**
+		 * Handles POST requests
+		 * @returns {boolean} True if request was successfully handled, otherwise false
+		 * @type {RequestHandlerPOST}
+		*/
+		this.post = this.__post;
 	}
 
 	// eslint-disable-next-line valid-jsdoc
@@ -793,13 +820,9 @@ class RequestEvent extends EventListener.Event {
 
 	// eslint-disable-next-line valid-jsdoc
 	/**
-	 * Handles POST method
-	 * @param {(bodyParsed: string | Object<string, any>, bodyBuffer: Buffer) => void} callback Request callback function
-	 * @param {"text" | "json" | "form" | "raw"} [type] Request body type (Default: depending on `content-type` header)
-	 * @returns {boolean} True if request was successfully handled, otherwise false
-	 * @memberof RequestEvent
+	 * @private
 	 */
-	post(callback, type) {
+	__post(callback, type) {
 		if(typeof callback !== "function") throw new TypeError("'callback' parameter is not type of function");
 
 		if(!type) {
