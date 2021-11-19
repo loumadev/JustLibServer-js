@@ -1,3 +1,5 @@
+//@ts-check
+
 const http = require("http");
 const path = require("path");
 const util = require("util");
@@ -21,9 +23,7 @@ const PATH = {
 
 class Server extends EventListenerStatic {
 	/**
-	 * @typedef {Object} Credentials
-	 * @prop {string} username
-	 * @prop {string} password
+	 * @typedef {{username: string, password: string} | {token: string}} Credentials
 	 */
 
 	static title = null;
@@ -202,9 +202,9 @@ class Server extends EventListenerStatic {
 			this.http.listen(this.config["http-port"]);
 			this.http.on("listening", e => {
 				this.log("§7Server listen on port §f" + this.config["http-port"]);
-				this.log(`§7Initialization done (§ftook ${new Date() - startDate}ms§7)`);
+				this.log(`§7Initialization done (§ftook ${new Date().getTime() - startDate.getTime()}ms§7)`);
 			});
-		} else this.log(`§7Initialization done (§ftook ${new Date() - startDate}ms§7)`);
+		} else this.log(`§7Initialization done (§ftook ${new Date().getTime() - startDate.getTime()}ms§7)`);
 	}
 
 	static stop(code = 0, force = false) {
@@ -469,7 +469,7 @@ class Server extends EventListenerStatic {
 		}
 
 		//Apply Trusted IPs
-		this.TRUSTED_IPS = JSON.parse(fs.readFileSync(PATH.TRUSTED_IPS));
+		this.TRUSTED_IPS = JSON.parse(fs.readFileSync(PATH.TRUSTED_IPS).toString());
 
 		this.log(`§7Loaded §f${this.TRUSTED_IPS.length} §7trusted IPs`);
 	}
@@ -485,7 +485,7 @@ class Server extends EventListenerStatic {
 		}
 
 		//Apply Blacklist
-		this.BLACKLIST = JSON.parse(fs.readFileSync(PATH.BLACKLIST));
+		this.BLACKLIST = JSON.parse(fs.readFileSync(PATH.BLACKLIST).toString());
 
 		this.log(`§7Loaded §f${this.BLACKLIST.length} §7blacklisted IPs`);
 	}
@@ -987,7 +987,7 @@ class RequestEvent extends EventListener.Event {
 
 		//Unsupported auth
 		this.send("500 Cannot process provided authentication type", 500);
-		throw new TypeError("Invalid credentials / unsupported authentication type", credentials, auth);
+		throw new TypeError("Invalid credentials / unsupported authentication type" + JSON.stringify({credentials, auth}));
 	}
 
 	/**
@@ -1165,7 +1165,7 @@ class CookieJar {
 
 	/**
 	 * Adds cookie to the Jar
-	 * @param {string | CookieJar.Cookie | http.ServerResponse} cookie Cookie name (requires second parameter), Cookie String, CookieJar.Cookie object, ServerResponseLike object
+	 * @param {string | CookieJar.Cookie | http.IncomingMessage} cookie Cookie name (requires second parameter), Cookie String, CookieJar.Cookie object, ServerResponseLike object
 	 * @param {string} [value=undefined]
 	 * @param {Object<string, any>} [options={}]
 	 * @returns {CookieJar}
@@ -1197,7 +1197,7 @@ class CookieJar {
 		if(typeof cookie == "object") {
 			const cookieString = cookie?.headers?.cookie;
 			const header = cookie?.headers?.raw?.()?.["set-cookie"];
-			const jsonObject = Object.keys(cookie) == "cookies" ? cookie.cookies : null;
+			const jsonObject = Object.keys(cookie).includes("cookies") ? cookie.cookies : null;
 
 			//Set by Request object
 			if(cookieString) {
@@ -1256,7 +1256,7 @@ class CookieJar {
 		else throw new TypeError("Invalid cookie: " + cookie);
 
 		const id = this.cookies.indexOf(_cookie);
-		if(id < 0 || !_cookie) return false;
+		if(id < 0 || !_cookie) return null;
 		else this.cookies.splice(id, 1);
 		return _cookie;
 	}
@@ -1340,7 +1340,7 @@ class CookieJar {
 
 	/**
 	 * Adds cookies to the Jar
-	 * @param {CookieJar.Cookie} cookies
+	 * @param {CookieJar.Cookie[]} cookies
 	 * @memberof CookieJar
 	 */
 	_addCookiesToJar(...cookies) {
@@ -1784,7 +1784,7 @@ function getFileFormat(contentType, mismatch = "") {
 function getAllFiles(dirPath, depth = Infinity, i = 0, arrayOfFiles = []) {
 	if(i > depth) return arrayOfFiles;
 
-	files = fs.readdirSync(dirPath);
+	const files = fs.readdirSync(dirPath);
 
 	files.forEach(function(file) {
 		if(fs.statSync(dirPath + "/" + file).isDirectory()) {
