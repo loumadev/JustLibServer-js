@@ -1097,7 +1097,6 @@ class RequestEvent extends EventListener.Event {
 
 		//Send file
 		this.send(fs.createReadStream(filePath), status, getContentType(filePath), headers);
-		Server._connectionLog(status);
 		return true;
 	}
 
@@ -1124,7 +1123,7 @@ class RequestEvent extends EventListener.Event {
 
 		if(!range) {
 			headers["Content-Length"] = stat.size;
-			this.send(fs.createReadStream(filePath), status = 200, contentType, headers), Server._connectionLog(status);
+			this.send(fs.createReadStream(filePath), status = 200, contentType, headers);
 			return true;
 		}
 
