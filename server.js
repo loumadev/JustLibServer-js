@@ -240,9 +240,9 @@ class Server extends EventListenerStatic {
 
 		//TODO: Add error handling
 		//TODO: Add error event (ability to send custom 500 Internal Server Error)
-		const RemoteIP = req.connection.remoteAddress.split(":")[3];
+		const RemoteIP = req.socket.remoteAddress.split(":")[3];
 		const ProxyIP = req.headers["x-forwarded-for"];
-		const protocol = req.headers["x-forwarded-proto"] || `http${req.secure ? "s" : ""}`;
+		const protocol = req.headers["x-forwarded-proto"];
 		const HOST = req.headers["host"];
 		const IP = ProxyIP || RemoteIP;
 		const URL = url.parse(req.url, true);
