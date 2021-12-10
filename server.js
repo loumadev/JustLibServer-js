@@ -207,6 +207,13 @@ class Server extends EventListenerStatic {
 		} else this.log(`§7Initialization done (§ftook ${new Date().getTime() - startDate.getTime()}ms§7)`);
 	}
 
+	/**
+	 * Stops the server and fires the "unload" event
+	 * @static
+	 * @param {number} [code=0] Exit code
+	 * @param {boolean} [force=false] Toggles force flag in unload event
+	 * @memberof Server
+	 */
 	static stop(code = 0, force = false) {
 		this.log("§cStopping server...");
 
@@ -218,6 +225,16 @@ class Server extends EventListenerStatic {
 		});
 	}
 
+	/**
+	 * Internal method for handling incoming requests
+	 * @static
+	 * @param {http.IncomingMessage} req
+	 * @param {http.ServerResponse} res
+	 * @param {string} [redirectTo=null]
+	 * @param {RequestEvent} [prevEvent=null]
+	 * @return {void} 
+	 * @memberof Server
+	 */
 	static _handleRequest(req, res, redirectTo = null, prevEvent = null) {
 		if(redirectTo && !prevEvent) throw new TypeError("Cannot redirect request if there is no RequestEvent provided");
 
@@ -328,7 +345,7 @@ class Server extends EventListenerStatic {
 
 		//Default action
 		if(!EventObject.defaultPrevented) {
-			if(res.writableEnded) return this.warn(`Failed to write response after end. (Default action has not been prevented)`);
+			if(res.writableEnded) return void this.warn(`Failed to write response after end. (Default action has not been prevented)`);
 
 			try {
 				EventObject.streamFile(EventObject.resolvedFile);
