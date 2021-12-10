@@ -240,7 +240,8 @@ class Server extends EventListenerStatic {
 
 		//TODO: Add error handling
 		//TODO: Add error event (ability to send custom 500 Internal Server Error)
-		const RemoteIP = req.socket.remoteAddress.split(":")[3];
+		const _remoteAdd = req.socket.remoteAddress;
+		const RemoteIP = _remoteAdd.split(":")[3] || _remoteAdd;
 		const ProxyIP = req.headers["x-forwarded-for"];
 		const protocol = req.headers["x-forwarded-proto"];
 		const HOST = req.headers["host"];
@@ -482,7 +483,7 @@ class Server extends EventListenerStatic {
 		//Create default
 		if(!fs.existsSync(PATH.TRUSTED_IPS)) {
 			this.log(`§7Creating new blank §f${name} §7file...`);
-			fs.writeFileSync(PATH.TRUSTED_IPS, `["localhost"]`);
+			fs.writeFileSync(PATH.TRUSTED_IPS, JSON.stringify(["localhost", "127.0.0.1", "::1"]));
 		}
 
 		//Apply Trusted IPs
@@ -498,7 +499,7 @@ class Server extends EventListenerStatic {
 		//Create default
 		if(!fs.existsSync(PATH.BLACKLIST)) {
 			this.log(`§7Creating new blank §f${name} §7file...`);
-			fs.writeFileSync(PATH.BLACKLIST, `[]`);
+			fs.writeFileSync(PATH.BLACKLIST, JSON.stringify([]));
 		}
 
 		//Apply Blacklist
@@ -514,7 +515,7 @@ class Server extends EventListenerStatic {
 		//Create default
 		if(!fs.existsSync(PATH.BLACKLIST)) {
 			this.log(`§7Creating new blank §f${name} §7file...`);
-			fs.writeFileSync(PATH.BLACKLIST, `[]`);
+			fs.writeFileSync(PATH.BLACKLIST, JSON.stringify([]));
 		}
 
 		//Save blacklist
