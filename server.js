@@ -8,8 +8,8 @@ const fs = require("fs");
 const {EventListenerStatic, EventListener, fixDigits, iterate, getQueryParameters} = require("./JustLib.js");
 const {CLI, KEY} = require("./CLI");
 
-const btoa = data => Buffer.from(data).toString("base64");
-const atob = data => Buffer.from(data, "base64").toString();
+const btoa = data => Buffer.from(data, "binary").toString("base64");
+const atob = data => Buffer.from(data, "base64").toString("binary");
 
 const PATH = {
 	CONFIG: __dirname + "/config.json",
