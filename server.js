@@ -622,6 +622,10 @@ class RequestEvent extends EventListener.Event {
 	 */
 
 	/**
+	 * @typedef {(query: Object<string, string>) => void} RequestCallbackOPTIONS
+	 */
+
+	/**
 	 * @typedef {
 			((callback: RequestCallbackGET) => boolean) &
 			((middleware: MiddlewareCallback, callback: RequestCallbackGET) => boolean) &
@@ -636,6 +640,10 @@ class RequestEvent extends EventListener.Event {
 			((callback: (bodyParsed: Object<string, any>, bodyBuffer: Buffer) => void, type: "json" | "form") => boolean) &
 			((callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean) &
 		} RequestHandlerPOST
+	 */
+
+	/**
+	 * @typedef {(callback: RequestCallbackOPTIONS) => boolean} RequestHandlerOPTIONS
 	 */
 
 	//TODO: Add middlewares support for POST requests
@@ -804,6 +812,13 @@ class RequestEvent extends EventListener.Event {
 		 * @type {RequestHandlerPOST}
 		*/
 		this.post = this.__post;
+
+		/**
+		 * Handles OPTIONS requests
+		 * @returns {boolean} True if request was successfully handled, otherwise false
+		 * @type {RequestHandlerOPTIONS}
+		*/
+		this.options = this.__options;
 	}
 
 	// eslint-disable-next-line valid-jsdoc
@@ -894,6 +909,18 @@ class RequestEvent extends EventListener.Event {
 
 			return true;
 		} else return false;
+	}
+
+	__options(callback) {
+		if(typeof callback !== "function") throw new TypeError("'callback' parameter is not type of function");
+
+		if(this.req.method == "OPTIONS") {
+			if(this.autoPrevent) this.defaultPrevented = true;
+
+			callback(this.query);
+			return true;
+		} else return false;
+
 	}
 
 	//TODO: Add more methods
