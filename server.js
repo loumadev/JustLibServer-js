@@ -937,6 +937,7 @@ class RequestEvent extends EventListener.Event {
 		this.preventDefault();
 		this.res.writeHead(status, {"Location": destination});
 		this.res.end();
+		Server._connectionLog(status);
 	}
 
 	// eslint-disable-next-line valid-jsdoc
