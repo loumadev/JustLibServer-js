@@ -638,7 +638,7 @@ class RequestEvent extends EventListener.Event {
 			((callback: (bodyParsed: string | Object<string, any>, bodyBuffer: Buffer) => void) => boolean) &
 			((callback: (bodyParsed: string, bodyBuffer: Buffer) => void, type: "text") => boolean) &
 			((callback: (bodyParsed: Object<string, any>, bodyBuffer: Buffer) => void, type: "json" | "form") => boolean) &
-			((callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean) &
+			((callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean)
 		} RequestHandlerPOST
 	 */
 
