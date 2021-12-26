@@ -35,6 +35,7 @@ class CLI extends EventListener {
 		this.isResumed = false;
 		this.printCommand = true;
 		this.hasHint = false;
+		this.awaitingInputsQueue = [];
 
 		this.KEY = {...KEY, ...customKeyMap};
 	}
@@ -105,26 +106,41 @@ class CLI extends EventListener {
 		const command = args.shift();
 
 		//Output
-		if(this.printCommand) this.dispatchEvent("stdout", {data: (cli.prompt + input + "\n"), string: cli._unescape(cli.prompt + input + "\n")});
+		if(this.printCommand) this.dispatchEvent("stdout", {
+			data: (cli.prompt + input + "\n"),
+			string: cli._unescape(cli.prompt + input + "\n")
+		});
 
 		//Input
 		targetStream.__write.apply(targetStream, ["\r\x1b[K" + (this.printCommand ? cli.prompt + input + "\r\n" : "") + cli.prompt]);
-		this.dispatchEvent("command", {input, command, args}, event => {
-			this.dispatchEvent("unknownCommand", event);
-		});
+
+		//Events
+		if(this.awaitingInputsQueue.length == 0) {
+			this.dispatchEvent("command", {input, command, args}, event => {
+				this.dispatchEvent("unknownCommand", event);
+			});
+		} else if(this.awaitingInputsQueue[0].isActive) {
+			const awaitingInput = this.awaitingInputsQueue.shift();
+			awaitingInput.resolve(input);
+			this.setPrompt(awaitingInput.cachePrompt);
+		}
+
 		this.dispatchEvent("input", {input});
+
+		if(this.awaitingInputsQueue.length > 0) {
+			const awaitingInput = this.awaitingInputsQueue[0];
+			awaitingInput.cachePrompt = this.prompt;
+			awaitingInput.isActive = true;
+			this.setPrompt(awaitingInput.prompt);
+		}
 	}
 
 
 	getInput(prompt = this.prompt) {
 		return new Promise((resolve, reject) => {
-			const temp = this.prompt;
-			this.prompt = prompt;
-
-			const listener = this.addEventListener("input", e => {
-				this.prompt = temp;
-				this.removeEventListener(listener);
-				resolve(e.input);
+			this.awaitingInputsQueue.push({
+				prompt: prompt,
+				resolve: resolve
 			});
 		});
 	}
