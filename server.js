@@ -57,6 +57,9 @@ class Server extends EventListenerStatic {
 
 	static isStopping = false;
 
+	static __dirname = __dirname;
+	static __filename = __filename;
+
 	static begin() {
 		/**
 		 * @type {
