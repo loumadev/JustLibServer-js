@@ -246,7 +246,7 @@ class Server extends EventListenerStatic {
 		const _remoteAdd = req.socket.remoteAddress;
 		const RemoteIP = _remoteAdd.split(":")[3] || _remoteAdd;
 		const ProxyIP = req.headers["x-forwarded-for"];
-		const protocol = req.headers["x-forwarded-proto"];
+		const protocol = req.headers["x-forwarded-proto"] || "http";
 		const HOST = req.headers["host"];
 		const IP = ProxyIP || RemoteIP;
 		const URL = url.parse(req.url, true);
