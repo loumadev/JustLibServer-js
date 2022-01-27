@@ -962,8 +962,6 @@ class RequestEvent extends EventListener.Event {
 	redirectURL(destination, status = 307) {
 		if(typeof destination !== "string") throw new TypeError("'destination' parameter is not type of string");
 
-		if(destination.startsWith("/")) destination = this.origin + destination;
-
 		this.preventDefault();
 		this.res.writeHead(status, {"Location": destination});
 		this.res.end();
