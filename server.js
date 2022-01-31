@@ -460,6 +460,9 @@ class Server extends EventListenerStatic {
 			//Skip not '*.js' files
 			if(fs.lstatSync(file).isDirectory() || !file.endsWith(".js")) continue;
 
+			//Skip files prefixed with '-'
+			if(filename.startsWith("-")) continue;
+
 			//Execute file
 			try {
 				this.modules[moduleName] = {
