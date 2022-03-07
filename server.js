@@ -149,11 +149,11 @@ class Server extends EventListenerStatic {
 				} else if(command == "exec") {
 					const [filePath = "autoexec.cfg"] = args;
 
-					fs.promises.readFile(path.join(__dirname, filePath)).catch(err => {
-						this.log(`§c[ERROR]: ${err.message}`);
-					}).then(file => {
+					fs.promises.readFile(path.join(__dirname, filePath)).then(file => {
 						Server.log(`Executing ${filePath}...`);
 						this.stdio.cli.sendInput(file.toString());
+					}).catch(err => {
+						this.log(`§c[ERROR]: ${err.message}`);
 					});
 				} else if(command == "") {
 
