@@ -417,23 +417,18 @@ class Server extends EventListenerStatic {
 
 		//Get current config
 		const config = JSON.parse(fs.readFileSync(PATH.CONFIG).toString());
-		let changes = 0;
 
-		//Get missing options
-		for(const property in DEFAULT_CONFIG) {
-			if(property in config) continue;
-			config[property] = DEFAULT_CONFIG[property];
-			changes++;
-		}
+		//Add missing/new properties from default configuration
+		const merged = objectDeepMerge(DEFAULT_CONFIG, config, false);
 
 		//Update config
-		if(changes) {
-			fs.writeFileSync(PATH.CONFIG, JSON.stringify(config, null, "\t"));
-			this.log(`§7Added §f${changes} §7new options to §f${name}`);
+		if(JSON.stringify(config) !== JSON.stringify(merged)) {
+			fs.writeFileSync(PATH.CONFIG, JSON.stringify(merged, null, "\t"));
+			this.log(`§7Updated §f${name} §7with latest/missing properties`);
 		}
 
 		//Apply config
-		this.config = config;
+		this.config = merged;
 
 		this.log("§7Configuration loaded");
 	}
