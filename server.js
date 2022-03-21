@@ -1,5 +1,6 @@
 //@ts-check
 
+const formidable = require("formidable");
 const http = require("http");
 const path = require("path");
 const util = require("util");
@@ -638,25 +639,24 @@ class RequestEvent extends EventListener.Event {
 	 * @typedef {
 			((callback: (bodyParsed: string | Object<string, any>, bodyBuffer: Buffer) => void) => boolean) &
 			((callback: (bodyParsed: string, bodyBuffer: Buffer) => void, type: "text") => boolean) &
-			((callback: (bodyParsed: Object<string, any>, bodyBuffer: Buffer) => void, type: "json" | "form") => boolean) &
-			((callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean)
+			((callback: (bodyParsed: Object<string, any>, bodyBuffer: Buffer) => void, type: "json" | "form" | "multipart") => boolean) &
+			((callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean) &
+
+			((middleware: MiddlewareCallback, callback: (bodyParsed: string | Object<string, any>, bodyBuffer: Buffer) => void) => boolean) &
+			((middleware: MiddlewareCallback, callback: (bodyParsed: string, bodyBuffer: Buffer) => void, type: "text") => boolean) &
+			((middleware: MiddlewareCallback, callback: (bodyParsed: Object<string, any>, bodyBuffer: Buffer) => void, type: "json" | "form" | "multipart") => boolean) &
+			((middleware: MiddlewareCallback, callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean) &
+
+			((middleware: MiddlewareCallback[], callback: (bodyParsed: string | Object<string, any>, bodyBuffer: Buffer) => void) => boolean) &
+			((middleware: MiddlewareCallback[], callback: (bodyParsed: string, bodyBuffer: Buffer) => void, type: "text") => boolean) &
+			((middleware: MiddlewareCallback[], callback: (bodyParsed: Object<string, any>, bodyBuffer: Buffer) => void, type: "json" | "form" | "multipart") => boolean) &
+			((middleware: MiddlewareCallback[], callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean)
 		} RequestHandlerPOST
 	 */
 
 	/**
 	 * @typedef {(callback: RequestCallbackOPTIONS) => boolean} RequestHandlerOPTIONS
 	 */
-
-	//TODO: Add middlewares support for POST requests
-	// ((middleware: MiddlewareCallback, callback: (bodyParsed: string | Object<string, any>, bodyBuffer: Buffer) => void) => boolean) &
-	// ((middleware: MiddlewareCallback, callback: (bodyParsed: string, bodyBuffer: Buffer) => void, type: "text") => boolean) &
-	// ((middleware: MiddlewareCallback, callback: (bodyParsed: Object<string, any>, bodyBuffer: Buffer) => void, type: "json" | "form") => boolean) &
-	// ((middleware: MiddlewareCallback, callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean) &
-
-	// ((middleware: MiddlewareCallback[], callback: (bodyParsed: string | Object<string, any>, bodyBuffer: Buffer) => void) => boolean) &
-	// ((middleware: MiddlewareCallback[], callback: (bodyParsed: string, bodyBuffer: Buffer) => void, type: "text") => boolean) &
-	// ((middleware: MiddlewareCallback[], callback: (bodyParsed: Object<string, any>, bodyBuffer: Buffer) => void, type: "json" | "form") => boolean) &
-	// ((middleware: MiddlewareCallback[], callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean)
 
 	constructor(data) {
 		super(data);
@@ -799,6 +799,11 @@ class RequestEvent extends EventListener.Event {
 		 */
 		this.resolvedFile;
 
+		/**
+		 * @type {formidable.Options} Formidable options
+		 */
+		this.formidableOptions = {};
+
 
 		/**
 		 * Handles GET requests
@@ -827,6 +832,7 @@ class RequestEvent extends EventListener.Event {
 	 * @private
 	 */
 	__get(middlewares, callback = null) {
+		//Middlewares
 		if(!callback && typeof middlewares === "function") { // f(callback)
 			callback = middlewares;
 			middlewares = [];
@@ -842,11 +848,11 @@ class RequestEvent extends EventListener.Event {
 			};
 		};
 
+		//Request handling
 		if(this.req.method == "GET") {
 			if(this.autoPrevent) this.defaultPrevented = true;
 
-			if(!middlewares.length) callback(this.query);
-			else executor(middlewares)();
+			executor(middlewares)();
 
 			return true;
 		} else return false;
@@ -856,57 +862,45 @@ class RequestEvent extends EventListener.Event {
 	/**
 	 * @private
 	 */
-	__post(callback, type) {
-		if(typeof callback !== "function") throw new TypeError("'callback' parameter is not type of function");
+	__post(middlewares, callback, type) {
+		//Middlewares
+		if(typeof middlewares === "function") {
+			if(typeof callback === "function") { // f(middleware, callback[, type])
+				middlewares = [middlewares];
+			} else { // f(callback[, type])
+				if(typeof callback === "string") type = callback; // f(callback, type)
+				callback = middlewares;
+				middlewares = [];
+			}
+		}
 
+		if(!middlewares || (middlewares.length && typeof middlewares[0] !== "function")) throw new TypeError("'middlewares' parameter must be either type of function[] or function");
+		if(typeof callback !== "function") throw new TypeError("'callback' parameter must be type of function");
+
+		const executor = (middlewares, i = 0) => {
+			return () => {
+				if(i == middlewares.length) callback(this.body, this.bodyRaw);
+				else middlewares[i](this, executor(middlewares, i + 1));
+			};
+		};
+
+		//Type checking
 		if(!type) {
 			const contentType = this.headers["content-type"] || "";
 
 			if(contentType.indexOf("application/json") != -1) type = "json";
 			else if(contentType.indexOf("application/x-www-form-urlencoded") != -1) type = "form";
+			else if(contentType.indexOf("multipart/form-data") != -1) type = "multipart";
 			else if(contentType.indexOf("text") != -1) type = "text";
 			else type = "raw";
 		}
+		this.__postType = type;
 
+		middlewares.push(Server.POST_BODY_HANDLER);
+
+		//Request Handling
 		if(this.req.method == "POST") {
-			if(this.autoPrevent) this.defaultPrevented = true;
-
-			if(this.isBodyReceived) {
-				callback(this.body, this.bodyRaw);
-			}
-
-			const chunks = [];
-
-			this.req.on("data", chunk => {
-				chunks.push(chunk);
-			});
-
-			this.req.on("end", () => {
-				const buffer = Buffer.concat(chunks);
-				let body = undefined;
-
-				if(type == "json") {
-					try {
-						body = JSON.parse(buffer.toString());
-					} catch(e) {
-						body = null;
-					}
-				} else if(type == "form") {
-					body = getQueryParameters(buffer.toString());
-				} else if(type == "text") {
-					body = buffer.toString();
-				} else if(type == "raw") {
-					body = buffer;
-				} else {
-					throw new TypeError(`'${type}' is invalid content type`);
-				}
-
-				this.body = body;
-				this.bodyRaw = buffer;
-				this.isBodyReceived = true;
-
-				callback(body, buffer);
-			});
+			executor(middlewares)();
 
 			return true;
 		} else return false;
@@ -1181,6 +1175,15 @@ class RequestEvent extends EventListener.Event {
 	 */
 	setHeader(name, value) {
 		this.res.setHeader(name, value);
+	}
+
+	/**
+	 * Set formidable options, which will be used for handling multipart/form-data request
+	 * @param {formidable.Options} options
+	 * @memberof RequestEvent
+	 */
+	setFormidableOptions(options) {
+		this.formidableOptions = options;
 	}
 
 	/**
@@ -1763,6 +1766,93 @@ const STATUS = {
 	}
 };
 Server.STATUS = STATUS;
+
+// eslint-disable-next-line valid-jsdoc
+/** @type {MiddlewareCallback} */
+Server.POST_BODY_HANDLER = function(event, next) {
+	if(event.method === "POST") {
+		if(event.autoPrevent) event.defaultPrevented = true;
+
+		//Skip body handling if it's already handled
+		if(event.isBodyReceived) {
+			next();
+			return;
+		}
+
+		const type = event.__postType;
+
+		if(type == "multipart") {
+			const form = new formidable.IncomingForm(event.formidableOptions);
+			const body = {};
+
+			//Handle multipart/form-data request body
+			form.parse(event.req, err => {
+				if(err) throw err;
+
+				//Create single value properties
+				for(const key in body) {
+					if(!body.hasOwnProperty(key)) continue;
+
+					const field = body[key];
+					field.value = field.array[field.array.length - 1];
+				}
+
+				//Set internal properties
+				event.body = body;
+				event.bodyRaw = undefined;
+				event.isBodyReceived = true;
+
+				next();
+			});
+
+			//Handle multiple files
+			form.on("file", (field, file) => {
+				if(!body[field]) body[field] = {array: []};
+				body[field].array.push(file);
+			});
+
+			//Handle multiple fields
+			form.on("field", (field, value) => {
+				if(!body[value]) body[field] = {array: []};
+				body[field].array.push(value);
+			});
+		} else {
+			const chunks = [];
+
+			event.req.on("data", chunk => {
+				chunks.push(chunk);
+			});
+
+			event.req.on("end", () => {
+				const buffer = Buffer.concat(chunks);
+				let body = undefined;
+
+				if(type == "json") {
+					try {
+						body = JSON.parse(buffer.toString());
+					} catch(e) {
+						body = null;
+					}
+				} else if(type == "form") {
+					body = getQueryParameters(buffer.toString());
+				} else if(type == "text") {
+					body = buffer.toString();
+				} else if(type == "raw") {
+					body = buffer;
+				} else {
+					throw new TypeError(`'${type}' is invalid content type`);
+				}
+
+				event.body = body;
+				event.bodyRaw = buffer;
+				event.isBodyReceived = true;
+
+				next();
+			});
+		}
+	}
+};
+
 
 /* Helper Functions */
 function readFileAsync(path, ...options) {
