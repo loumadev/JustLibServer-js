@@ -616,15 +616,19 @@ class Server extends EventListenerStatic {
  */
 class RequestEvent extends EventListener.Event {
 	/**
+	 * @typedef {Object<string, string>} RequestQuery
+	 */
+
+	/**
 	 * @typedef {(event: RequestEvent, next: Function) => void} MiddlewareCallback
 	 */
 
 	/**
-	 * @typedef {(query: Object<string, string>) => void} RequestCallbackGET
+	 * @typedef {(query: RequestQuery) => void} RequestCallbackGET
 	 */
 
 	/**
-	 * @typedef {(query: Object<string, string>) => void} RequestCallbackOPTIONS
+	 * @typedef {(query: RequestQuery) => void} RequestCallbackOPTIONS
 	 */
 
 	/**
@@ -740,7 +744,7 @@ class RequestEvent extends EventListener.Event {
 		this.Path;
 
 		/**
-		 * @type {Object<string, string>} Request query string parameters object
+		 * @type {RequestQuery} Request query string parameters object
 		 */
 		this.query;
 
