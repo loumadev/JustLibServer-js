@@ -31,8 +31,25 @@ class Server extends EventListenerStatic {
 	 * @typedef {{username: string, password: string} | {token: string}} Credentials
 	 */
 
+	/**
+	 * @typedef {Object} Module
+	 * @prop {boolean} loaded Flag indicating if the module has been loaded
+	 * @prop {any} exports The exports of the module
+	 */
+
+	/**
+	 * Title of the server terminal window
+	 * @type {string}
+	 */
 	static title = null;
+
+	/**
+	 * Cache of loaded modules.
+	 * Property key is the relative path to the module file.
+	 * @type {Object<string, Module>}
+	 */
 	static modules = {};
+
 	/**
 	 * Server standard input/output
 	 * @static
