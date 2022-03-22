@@ -20,6 +20,10 @@ const PATH = {
 	PUBLIC: __dirname + "/public/"
 };
 
+/**
+ * @typedef {Object<string, any>} ObjectLiteral
+ */
+
 //TODO: Replace status numbers with `Server.STATUS` enum
 
 class Server extends EventListenerStatic {
@@ -641,19 +645,19 @@ class RequestEvent extends EventListener.Event {
 
 	/**
 	 * @typedef {
-			((callback: (bodyParsed: string | Object<string, any>, bodyBuffer: Buffer) => void) => boolean) &
+			((callback: (bodyParsed: string | ObjectLiteral, bodyBuffer: Buffer) => void) => boolean) &
 			((callback: (bodyParsed: string, bodyBuffer: Buffer) => void, type: "text") => boolean) &
-			((callback: (bodyParsed: Object<string, any>, bodyBuffer: Buffer) => void, type: "json" | "form" | "multipart") => boolean) &
+			((callback: (bodyParsed: ObjectLiteral, bodyBuffer: Buffer) => void, type: "json" | "form" | "multipart") => boolean) &
 			((callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean) &
 
-			((middleware: MiddlewareCallback, callback: (bodyParsed: string | Object<string, any>, bodyBuffer: Buffer) => void) => boolean) &
+			((middleware: MiddlewareCallback, callback: (bodyParsed: string | ObjectLiteral, bodyBuffer: Buffer) => void) => boolean) &
 			((middleware: MiddlewareCallback, callback: (bodyParsed: string, bodyBuffer: Buffer) => void, type: "text") => boolean) &
-			((middleware: MiddlewareCallback, callback: (bodyParsed: Object<string, any>, bodyBuffer: Buffer) => void, type: "json" | "form" | "multipart") => boolean) &
+			((middleware: MiddlewareCallback, callback: (bodyParsed: ObjectLiteral, bodyBuffer: Buffer) => void, type: "json" | "form" | "multipart") => boolean) &
 			((middleware: MiddlewareCallback, callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean) &
 
-			((middleware: MiddlewareCallback[], callback: (bodyParsed: string | Object<string, any>, bodyBuffer: Buffer) => void) => boolean) &
+			((middleware: MiddlewareCallback[], callback: (bodyParsed: string | ObjectLiteral, bodyBuffer: Buffer) => void) => boolean) &
 			((middleware: MiddlewareCallback[], callback: (bodyParsed: string, bodyBuffer: Buffer) => void, type: "text") => boolean) &
-			((middleware: MiddlewareCallback[], callback: (bodyParsed: Object<string, any>, bodyBuffer: Buffer) => void, type: "json" | "form" | "multipart") => boolean) &
+			((middleware: MiddlewareCallback[], callback: (bodyParsed: ObjectLiteral, bodyBuffer: Buffer) => void, type: "json" | "form" | "multipart") => boolean) &
 			((middleware: MiddlewareCallback[], callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean)
 		} RequestHandlerPOST
 	 */
@@ -794,7 +798,7 @@ class RequestEvent extends EventListener.Event {
 		this.body = undefined;
 
 		/**
-		 * @type {Object<string, any>} Represents custom data object. Could be used in the middlewares to transfer data into event handlers.
+		 * @type {ObjectLiteral} Represents custom data object. Could be used in the middlewares to transfer data into event handlers.
 		 */
 		this.data = {};
 
@@ -1035,7 +1039,7 @@ class RequestEvent extends EventListener.Event {
 
 	/**
 	 * Send response to the client
-	 * @param {string | Object<string, any> | Buffer | ReadableStream} data Data to be sent as response
+	 * @param {string | ObjectLiteral | Buffer | ReadableStream} data Data to be sent as response
 	 * @param {number} [status=200] Response status code
 	 * @param {string | "text/plain" | "text/html" | "application/json" | "image/png" | "audio/mpeg" | "video/mp4"} [contentType="text/plain"] Content type of the response
 	 * @param {http.OutgoingHttpHeaders} [headers={}] Response headers
@@ -1079,7 +1083,7 @@ class RequestEvent extends EventListener.Event {
 
 	/**
 	 * @typedef {Object} SendOptions
-	 * @prop {string | Object<string, any> | Buffer | ReadableStream} data 
+	 * @prop {string | ObjectLiteral | Buffer | ReadableStream} data 
 	 * @prop {number} [status=200] 
 	 * @prop {string} [contentType="text/plain"] 
 	 * @prop {http.OutgoingHttpHeaders} [headers={}] 
@@ -1218,7 +1222,7 @@ class CookieJar {
 	 * Adds cookie to the Jar
 	 * @param {string | CookieJar.Cookie | http.IncomingMessage} cookie Cookie name (requires second parameter), Cookie String, CookieJar.Cookie object, ServerResponseLike object
 	 * @param {string} [value=undefined]
-	 * @param {Object<string, any>} [options={}]
+	 * @param {ObjectLiteral} [options={}]
 	 * @returns {CookieJar}
 	 * @memberof CookieJar
 	 */
