@@ -187,7 +187,11 @@ class CLI extends EventListener {
 	_keyProcess(key, stream = this.stdout) {
 		const buffer = [...key].map(e => e.charCodeAt(0));
 
-		if(this._keyCompare(buffer, this.KEY.ARROW_UP)) {
+		if(this._keyCompare(buffer, this.KEY.SIGINT)) {
+			process.kill(process.pid, "SIGINT");
+			return null;
+		}
+		else if(this._keyCompare(buffer, this.KEY.ARROW_UP)) {
 			if(this.pointer == this.history.length)
 				this.current = this.buffer;
 			if(this.pointer) {
@@ -285,6 +289,7 @@ class CLI extends EventListener {
 }
 
 const KEY = {
+	SIGINT: [3],
 	RETURN: [13],
 	BACKSPACE: [8],
 	CTRL_BACKSPACE: [127],
