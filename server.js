@@ -653,6 +653,20 @@ class RequestEvent extends EventListener.Event {
 	 */
 
 	/**
+	 * @typedef {Object} POSTMultipartField
+	 * @property {string | formidable.File} value Last received value for this field (including files)
+	 * @property {(string | formidable.File)[]} array Array of all values for this field (including files)
+	 * @property {formidable.File[]} files Array of all files for this field
+	 * @property {string[]} fields Array of all values for this field
+	 */
+
+	/**
+	 * POST request multipart body. Contains all fields and files received.
+	 * Property key is the field name.
+	 * @typedef {Object<string, POSTMultipartField>} POSTMultipartBody
+	 */
+
+	/**
 	 * @typedef {
 			((callback: RequestCallbackGET) => boolean) &
 			((middleware: MiddlewareCallback, callback: RequestCallbackGET) => boolean) &
@@ -664,17 +678,20 @@ class RequestEvent extends EventListener.Event {
 	 * @typedef {
 			((callback: (bodyParsed: string | ObjectLiteral, bodyBuffer: Buffer) => void) => boolean) &
 			((callback: (bodyParsed: string, bodyBuffer: Buffer) => void, type: "text") => boolean) &
-			((callback: (bodyParsed: ObjectLiteral, bodyBuffer: Buffer) => void, type: "json" | "form" | "multipart") => boolean) &
+			((callback: (bodyParsed: ObjectLiteral, bodyBuffer: Buffer) => void, type: "json" | "form") => boolean) &
+			((callback: (bodyParsed: POSTMultipartBody) => void, type: "multipart") => boolean) &
 			((callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean) &
 
 			((middleware: MiddlewareCallback, callback: (bodyParsed: string | ObjectLiteral, bodyBuffer: Buffer) => void) => boolean) &
 			((middleware: MiddlewareCallback, callback: (bodyParsed: string, bodyBuffer: Buffer) => void, type: "text") => boolean) &
-			((middleware: MiddlewareCallback, callback: (bodyParsed: ObjectLiteral, bodyBuffer: Buffer) => void, type: "json" | "form" | "multipart") => boolean) &
+			((middleware: MiddlewareCallback, callback: (bodyParsed: ObjectLiteral, bodyBuffer: Buffer) => void, type: "json" | "form") => boolean) &
+			((middleware: MiddlewareCallback, callback: (bodyParsed: POSTMultipartBody) => void, type: "multipart") => boolean) &
 			((middleware: MiddlewareCallback, callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean) &
 
 			((middleware: MiddlewareCallback[], callback: (bodyParsed: string | ObjectLiteral, bodyBuffer: Buffer) => void) => boolean) &
 			((middleware: MiddlewareCallback[], callback: (bodyParsed: string, bodyBuffer: Buffer) => void, type: "text") => boolean) &
-			((middleware: MiddlewareCallback[], callback: (bodyParsed: ObjectLiteral, bodyBuffer: Buffer) => void, type: "json" | "form" | "multipart") => boolean) &
+			((middleware: MiddlewareCallback[], callback: (bodyParsed: ObjectLiteral, bodyBuffer: Buffer) => void, type: "json" | "form") => boolean) &
+			((middleware: MiddlewareCallback[], callback: (bodyParsed: POSTMultipartBody) => void, type: "multipart") => boolean) &
 			((middleware: MiddlewareCallback[], callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean)
 		} RequestHandlerPOST
 	 */
@@ -1832,14 +1849,26 @@ Server.POST_BODY_HANDLER = function(event, next) {
 
 			//Handle multiple files
 			form.on("file", (field, file) => {
-				if(!body[field]) body[field] = {array: []};
+				if(!body[field]) body[field] = {
+					array: [],
+					files: [],
+					values: [],
+					value: null
+				};
 				body[field].array.push(file);
+				body[field].files.push(file);
 			});
 
 			//Handle multiple fields
 			form.on("field", (field, value) => {
-				if(!body[value]) body[field] = {array: []};
+				if(!body[value]) body[field] = {
+					array: [],
+					files: [],
+					values: [],
+					value: null
+				};
 				body[field].array.push(value);
+				body[field].values.push(value);
 			});
 		} else {
 			const chunks = [];
