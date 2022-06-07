@@ -1355,7 +1355,7 @@ class CookieJar {
 	 * @param {http.ServerResponse} response Server response object
 	 * @param {boolean} [full=true] Include cookie properties and flags
 	 * @param {boolean} [expired=full] Include expired cookies
-	 * @returns {CookieJar.Cookie}
+	 * @returns {CookieJar}
 	 * @memberof CookieJar
 	 */
 	sendCookies(response, full = true, expired = full) {
@@ -1475,7 +1475,7 @@ CookieJar.Cookie = class Cookie {
 	 */
 	toString(full = true) {
 		const head = `${this.name}=${this.value}; `;
-		const props = this.props.reduce((prev, {key, value}) => prev + `${key}=${value}; `, "");
+		const props = Object.reduce(this.props, (prev, [key, val]) => prev + `${key}=${val}; `, "");
 		const flags = this.flags.join("; ");
 
 		return full ? `${head}${props}${flags ? `${flags}; ` : ""}` : head;
