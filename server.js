@@ -219,7 +219,7 @@ class Server extends EventListenerStatic {
 
 		//Load event
 		this.log("§7Loading server...");
-		this.dispatchEvent("load");
+		await this.dispatchEvent("load", {async: true});
 		this.log("§7Server loaded");
 
 		//Make HTTP server listen for incoming requests
