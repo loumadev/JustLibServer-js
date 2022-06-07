@@ -202,17 +202,29 @@ class Server extends EventListenerStatic {
 
 		//Create HTTP server
 		if(this.config["enable-http-server"]) {
-			this.log("§7Creating HTTP server...");
+			//Create a new empty public folder for serving static files
 			if(!fs.existsSync(PATH.PUBLIC)) {
 				this.log(`§7Creating new empty §fpublic §7folder...`);
 				fs.mkdirSync(PATH.PUBLIC);
 			}
-			this.http = http.createServer((req, res) => this._handleRequest(req, res));
+
+			//Create HTTP server instance and and add all listeners
+			this.log("§7Creating HTTP server...");
+			this.http = http.createServer();
+			this.http.on("request", this._handleRequest.bind(this));
 			this.http.on("error", err => {
-				this.error(err.message);
+				this.error("HTTP Server Error:", err.message);
+			});
+			this.http.on("close", e => {
+				this.log(`§7HTTP server closed`);
+			});
+			this.http.on("listening", e => {
+				this.log(`§7HTTP server is listening on port §f${this.config["http-port"]}`);
 			});
 			this.log(`§7HTTP server created`);
-		} else this.log(`§6HTTP server is disabled!`);
+		} else {
+			this.log(`§6HTTP server is disabled!`);
+		}
 
 		//Modules
 		this._loadModules();
@@ -224,12 +236,15 @@ class Server extends EventListenerStatic {
 
 		//Make HTTP server listen for incoming requests
 		if(this.config["enable-http-server"]) {
-			this.http.listen(this.config["http-port"]);
-			this.http.on("listening", e => {
-				this.log("§7Server listen on port §f" + this.config["http-port"]);
-				this.log(`§7Initialization done (§ftook ${new Date().getTime() - startDate.getTime()}ms§7)`);
+			await new Promise(resolve => {
+				this.http.on("listening", resolve);
+				this.http.on("error", resolve);
+				this.http.listen(this.config["http-port"]);
 			});
-		} else this.log(`§7Initialization done (§ftook ${new Date().getTime() - startDate.getTime()}ms§7)`);
+		}
+
+		//Print startup duration
+		this.log(`§7Initialization done (§ftook ${new Date().getTime() - startDate.getTime()}ms§7)`);
 	}
 
 	/**
@@ -243,6 +258,7 @@ class Server extends EventListenerStatic {
 		this.log("§cStopping server...");
 
 		this.isStopping = true;
+		if(this.config["enable-http-server"] && this.http && this.http.listening) this.http.close();
 		this._saveBlacklist();
 
 		this.dispatchEvent("unload", {forced: force, async: true}).then(() => {
