@@ -82,7 +82,9 @@ class Server extends EventListenerStatic {
 	static __dirname = __dirname;
 	static __filename = __filename;
 
-	static begin() {
+	static environment = process.env.NODE_ENV || "development";
+
+	static async begin() {
 		/**
 		 * @type {
 				((event: string, listener: (event: RequestEvent) => void) => EventListener.Listener) &
