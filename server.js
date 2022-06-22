@@ -1288,7 +1288,7 @@ class CookieJar {
 			for(const [i, key, value] of iterate(options)) {
 				if(value == true) _cookie.flags.push(key);
 				else if(value == false) _cookie.flags.splice(_cookie.flags.indexOf(key), 1);
-				else _cookie.props[CookieJar.Cookie.formatKeyword(key) || key] = value;
+				else if(value !== undefined) _cookie.props[CookieJar.Cookie.formatKeyword(key) || key] = value;
 			}
 
 			this._addCookiesToJar(_cookie);
