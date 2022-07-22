@@ -487,6 +487,8 @@ class Server extends EventListenerStatic {
 
 		//Load modules
 		const files = getAllFiles(PATH.MODULES, 1);
+		const start = Date.now();
+
 		for(const file of files) {
 			let project = path.basename(path.dirname(file)); if(project == dirname) project = null;
 			const filename = path.basename(file);
@@ -500,11 +502,14 @@ class Server extends EventListenerStatic {
 
 			//Execute file
 			try {
+				const start = Date.now();
 				this.modules[moduleName] = {
 					loaded: true,
 					exports: require(file)
 				};
-				this.log(`§7Loaded §f${project ? project + "§7:§f" : ""}${filename}`);
+				const duration = Date.now() - start;
+				const color = [[500, "§4"], [250, "§6"], [-1, "§2"]].find(e => duration > e[0])[1];
+				this.log(`§7Loaded §f${project ? project + "§7:§f" : ""}${filename} §7(${color}+${duration}ms§7)`);
 			} catch(e) {
 				this.modules[moduleName] = {
 					loaded: false,
@@ -514,7 +519,7 @@ class Server extends EventListenerStatic {
 			}
 		}
 
-		this.log(`§7Loaded §f${Object.values(this.modules).filter(e => e.loaded).length}§7/§f${Object.values(this.modules).length} §7modules`);
+		this.log(`§7Loaded §f${Object.values(this.modules).filter(e => e.loaded).length}§7/§f${Object.values(this.modules).length} §7modules (§f${Date.now() - start}ms§7)`);
 	}
 
 	static _loadTrustedIPs() {
