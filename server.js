@@ -1870,6 +1870,11 @@ Server.POST_BODY_HANDLER = function(event, next) {
 				next();
 			});
 
+			form.on("error", err => {
+				Server.error("Failed to handle multipart request:", err);
+				event.send("500 Internal Server Error", 500);
+			});
+
 			//Handle multiple files
 			form.on("file", (field, file) => {
 				if(!body[field]) body[field] = {
