@@ -1847,6 +1847,11 @@ Server.POST_BODY_HANDLER = function(event, next) {
 		const type = event.__postType;
 
 		if(type == "multipart") {
+			if(+event.headers["content-length"] > event.formidableOptions.maxFileSize) {
+				event.send("413 Payload Too Large", Server.STATUS.CLIENT.PAYLOAD_TOO_LARGE);
+				return;
+			}
+
 			const form = new formidable.IncomingForm(event.formidableOptions);
 			const body = {};
 
