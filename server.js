@@ -867,7 +867,9 @@ class RequestEvent extends EventListener.Event {
 		/**
 		 * @type {formidable.Options} Formidable options
 		 */
-		this.formidableOptions = {};
+		this.formidableOptions = {
+			maxFileSize: 200 * 1024 * 1024
+		};
 
 
 		/**
