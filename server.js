@@ -629,26 +629,26 @@ class Server extends EventListenerStatic {
 	}
 
 	static log(...args) {
-		if(!this.stdio.settings.logs) return false;
+		if(!Server.stdio.settings.logs) return false;
 
-		const formattedArgs = this.formatArguments(args, {colors: true, depth: 4});
-		const message = `${this.formatTime()} ${formattedArgs}`;
+		const formattedArgs = Server.formatArguments(args, {colors: true, depth: 4});
+		const message = `${Server.formatTime()} ${formattedArgs}`;
 		console.log(message);
 	}
 
 	static warn(...args) {
-		if(!this.stdio.settings.warnings) return false;
+		if(!Server.stdio.settings.warnings) return false;
 
-		const formattedArgs = this.formatArguments(args, {colors: false, depth: 4});
-		const message = `\x1b[33m${this.formatTime()} [WARN]: ${formattedArgs}\x1b[0m`;
+		const formattedArgs = Server.formatArguments(args, {colors: false, depth: 4});
+		const message = `\x1b[33m${Server.formatTime()} [WARN]: ${formattedArgs}\x1b[0m`;
 		console.warn(message);
 	}
 
 	static error(...args) {
-		if(!this.stdio.settings.errors) return false;
+		if(!Server.stdio.settings.errors) return false;
 
-		const formattedArgs = this.formatArguments(args, {colors: false, depth: 4});
-		const message = `\x1b[31m${this.formatTime()} [ERROR]: ${formattedArgs}\x1b[0m`;
+		const formattedArgs = Server.formatArguments(args, {colors: false, depth: 4});
+		const message = `\x1b[31m${Server.formatTime()} [ERROR]: ${formattedArgs}\x1b[0m`;
 		console.error(message);
 	}
 }
