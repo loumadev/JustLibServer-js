@@ -570,6 +570,13 @@ class Server extends EventListenerStatic {
 		this.log(`§7Saved §f${this.BLACKLIST.length} §7blacklisted IPs`);
 	}
 
+	/**
+	 * Format a string with color codes.
+	 * @static
+	 * @param {string} msg
+	 * @return {string} 
+	 * @memberof Server
+	 */
 	static formatMessage(msg) {
 		const codes = ["30", "34", "32", "36", "31", "35", "33", "37", "90", "94", "92", "96", "91", "95", "93", "97"];
 		const message = (msg + "§r§7").replace(/§r/g, "\x1b[0m");
@@ -619,33 +626,65 @@ class Server extends EventListenerStatic {
 		return message;
 	}
 
-	static formatTime(d = new Date()) {
-		return `[${fixDigits(d.getHours())}:${fixDigits(d.getMinutes())}:${fixDigits(d.getSeconds())}]`;
+	/**
+	 * Formats input date into human readable string in format "[hh:mm:ss]"
+	 * @static
+	 * @param {Date | number} [time=Date.now()]
+	 * @return {string} 
+	 * @memberof Server
+	 */
+	static formatTime(time = Date.now()) {
+		time = new Date(time);
+		return `[${fixDigits(time.getHours())}:${fixDigits(time.getMinutes())}:${fixDigits(time.getSeconds())}]`;
 	}
 
+	/**
+	 * Sets the title of console window.
+	 * @static
+	 * @param {string} [title="Node.js Server - " + __filename]
+	 * @memberof Server
+	 */
 	static setTitle(title = "Node.js Server - " + __filename) {
 		this.title = title;
 		(process.stdout.__write || process.stdout.write).apply(process.stdout, [`${String.fromCharCode(27)}]0;${title}${String.fromCharCode(7)}`]);
 	}
 
+	/**
+	 * Logs message to stdout.
+	 * @static
+	 * @param {...any} args
+	 * @memberof Server
+	 */
 	static log(...args) {
-		if(!Server.stdio.settings.logs) return false;
+		if(!Server.stdio.settings.logs) return;
 
 		const formattedArgs = Server.formatArguments(args, {colors: true, depth: 4});
 		const message = `${Server.formatTime()} ${formattedArgs}`;
 		console.log(message);
 	}
 
+	/**
+	 * Logs warning message to stderr.
+	 * @static
+	 * @param {...any} args
+	 * @memberof Server
+	 */
 	static warn(...args) {
-		if(!Server.stdio.settings.warnings) return false;
+		if(!Server.stdio.settings.warnings) return;
 
 		const formattedArgs = Server.formatArguments(args, {colors: false, depth: 4});
 		const message = `\x1b[33m${Server.formatTime()} [WARN]: ${formattedArgs}\x1b[0m`;
 		console.warn(message);
 	}
 
+	/**
+	 * Logs error message to stderr.
+	 * @static
+	 * @param {...any} args
+	 * @memberof Server
+	 */
 	static error(...args) {
-		if(!Server.stdio.settings.errors) return false;
+		if(!Server.stdio.settings.errors) return;
 
 		const formattedArgs = Server.formatArguments(args, {colors: false, depth: 4});
 		const message = `\x1b[31m${Server.formatTime()} [ERROR]: ${formattedArgs}\x1b[0m`;
