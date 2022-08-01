@@ -281,8 +281,6 @@ class Server extends EventListenerStatic {
 	static _handleRequest(req, res, redirectTo = null, prevEvent = null) {
 		if(redirectTo && !prevEvent) throw new TypeError("Cannot redirect request if there is no RequestEvent provided");
 
-		//TODO: Add error handling
-		//TODO: Add error event (ability to send custom 500 Internal Server Error)
 		const _remoteAdd = req.socket.remoteAddress;
 		const RemoteIP = _remoteAdd.split(":")[3] || _remoteAdd;
 		const ProxyIP = req.headers["x-forwarded-for"];
@@ -349,54 +347,68 @@ class Server extends EventListenerStatic {
 		//if(destinationPath.length > 1 && destinationPath.endsWith("/")) EventObject.redirectURL(destinationPath.slice(0, -1), this.STATUS.REDIRECT.MOVED_PERMANENTLY);
 
 		//Dispatch events
-		this.dispatchEvent("request", EventObject);
-		if(!EventObject.defaultPrevented) this.dispatchEvent(destinationPath, EventObject);
+		(async () => {
+			//Dispatch "request" event
+			await this.dispatchEvent("request", EventObject);
+			if(EventObject.defaultPrevented) return;
 
-		//Dynamic destination path search
-		const searchDispatched = [];
-		for(const listener of this.listeners) {
-			const type = listener.type;
+			//Dispatch path event
+			await this.dispatchEvent(destinationPath, EventObject);
+			if(EventObject.defaultPrevented) return;
 
-			//Event was prevented
-			if(EventObject.defaultPrevented) break;
+			//Dynamic destination path search
+			const searchDispatched = [];
+			const listenerPromises = [];
 
-			//Event was already dispatched
-			if(searchDispatched.includes(type)) continue;
+			for(const listener of this.listeners) {
+				const type = listener.type;
 
-			//Create regex for each listener
-			if(!("regex" in listener)) {
-				if(["*", "?"].some(e => type.includes(e))) {
-					listener.regex = new RegExp(type.replace(/(\.|\(|\)|\[|\]|\||\{|\}|\+|\^|\$|\/|\-|\\)/g, "\\$1").replace(/\?/g, "(.)").replace(/\*/g, "(.*)"), "i");
-				} else {
-					listener.regex = null;
-					continue;
+				//Event was prevented
+				if(EventObject.defaultPrevented) break;
+
+				//Event was already dispatched
+				if(searchDispatched.includes(type)) continue;
+
+				//Create regex for each listener
+				if(!("regex" in listener)) {
+					if(["*", "?"].some(e => type.includes(e))) {
+						listener.regex = new RegExp(type.replace(/(\.|\(|\)|\[|\]|\||\{|\}|\+|\^|\$|\/|\-|\\)/g, "\\$1").replace(/\?/g, "(.)").replace(/\*/g, "(.*)"), "i");
+					} else {
+						listener.regex = null;
+						continue;
+					}
+				}
+
+				//Listener uses dynamic representation of destination path
+				if(listener.regex) {
+					const match = destinationPath.match(listener.regex);
+
+					//Destination path does not match required pattern
+					if(!match) continue;
+
+					//Add found matches to EventObject and dispatch event
+					EventObject.matches = match.slice(1);
+					searchDispatched.push(type);
+					listenerPromises.push(this.dispatchEvent(type, EventObject));
 				}
 			}
 
-			//Listener uses dynamic representation of destination path
-			if(listener.regex) {
-				const match = destinationPath.match(listener.regex);
+			//Wait for all listeners to finish
+			await Promise.all(listenerPromises);
+		})().then(() => {
+			//All listeners were processed
 
-				//Destination path does not match required pattern
-				if(!match) continue;
+			//If no listeners responded (prevented default action), try to serve static file
+			if(!EventObject.defaultPrevented) {
+				if(res.writableEnded) return this.warn(`Failed to write response after end. (Default action has not been prevented)`);
 
-				//Add found matches to EventObject and dispatch event
-				EventObject.matches = match.slice(1);
-				this.dispatchEvent(type, EventObject);
-				searchDispatched.push(type);
-			}
-		}
-
-		//Default action
-		if(!EventObject.defaultPrevented) {
-			if(res.writableEnded) return void this.warn(`Failed to write response after end. (Default action has not been prevented)`);
-
-			try {
+				//Serve static file. This call will internally respond with 404 if file is not found.
 				EventObject.streamFile(EventObject.resolvedFile);
-			} catch(err) {
-				this._handleNotFound(EventObject);
 			}
-		}
+		}).catch(err => {
+			//Catch all errors and process them
+			this._handleInternalError(EventObject, err);
+		});
 	}
 
 	/**
@@ -408,6 +420,25 @@ class Server extends EventListenerStatic {
 	static _handleNotFound(event) {
 		this.dispatchEvent("404", event.clone(), () => {
 			event.send("404 Not Found", 404);
+		});
+	}
+
+	/**
+	 *
+	 * @static
+	 * @param {RequestEvent} event
+	 * @param {Error} error
+	 * @memberof Server
+	 */
+	static _handleInternalError(event, error) {
+		const clone = event.clone();
+		clone.error = error;
+
+		//TODO: Maybe add some option to disable this logging? It might be annoying if there is implemented some custom handling.
+		Server.error("Failed to handle the incoming request:", error);
+
+		this.dispatchEvent("500", clone, () => {
+			event.send("500 Internal Server Error", 500);
 		});
 	}
 
@@ -770,6 +801,9 @@ class RequestEvent extends EventListener.Event {
 		Object.assign(this, listener);
 		Object.defineProperties(this.__proto__, Object.getOwnPropertyDescriptors(listener.__proto__));
 
+		//Properties to modify event distribution
+		this.async = true;
+		this.parallel = true;
 
 		/**
 		 * @type {
@@ -897,6 +931,11 @@ class RequestEvent extends EventListener.Event {
 		 * @type {ObjectLiteral} Represents custom data object. Could be used in the middlewares to transfer data into event handlers.
 		 */
 		this.data = {};
+
+		/**
+		 * @type {Error?} Error thrown by any of the request handlers
+		 */
+		this.error = null;
 
 		/**
 		 * @type {string} Resolved path to requested file in local file system
