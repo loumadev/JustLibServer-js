@@ -1269,7 +1269,6 @@ class RequestEvent extends EventListener.Event {
 			//Send part of file
 			this.send(fs.createReadStream(filePath, range), status = 206, contentType, headers);
 		}
-		Server._connectionLog(status);
 		return true;
 	}
 
