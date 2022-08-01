@@ -1174,9 +1174,9 @@ class RequestEvent extends EventListener.Event {
 
 				Server._connectionLog(event.responseStatus);
 			});
-
-		} else Server.warn(`Failed to write response after end. ('e.send()'/'e.streamFile()' might be called multiple times)`);
-		//TODO: Add more info to the warning (create separate method + include stack trace)
+		} else {
+			this._logWriteAfterEndWarning(new Error());
+		}
 	}
 
 	/**
@@ -1212,7 +1212,7 @@ class RequestEvent extends EventListener.Event {
 	 */
 	async sendFile(filePath, status = 200, headers = {}) {
 		this.preventDefault();
-		if(this.res.writableEnded) return Server.warn(`Failed to write response after end. ('e.send()'/'e.streamFile()' might be called multiple times)`);
+		if(this.res.writableEnded) return this._logWriteAfterEndWarning(new Error()), false;
 
 		const stat = await fs.promises.stat(filePath).catch(() => { });
 		if(!stat || stat.isDirectory()) {
@@ -1236,7 +1236,7 @@ class RequestEvent extends EventListener.Event {
 	 */
 	async streamFile(filePath, headers = {}) {
 		this.preventDefault();
-		if(this.res.writableEnded) return Server.warn(`Failed to write response after end. ('e.send()'/'e.streamFile()' might be called multiple times)`), false;
+		if(this.res.writableEnded) return this._logWriteAfterEndWarning(new Error()), false;
 
 		const contentType = getContentType(filePath);
 		const stat = await fs.promises.stat(filePath).catch(() => { });
@@ -1300,6 +1300,18 @@ class RequestEvent extends EventListener.Event {
 		event.reset();
 
 		return event;
+	}
+
+	/**
+	 *
+	 * @private
+	 * @param {Error} error
+	 * @memberof RequestEvent
+	 */
+	_logWriteAfterEndWarning(error) {
+		error.name = "";
+		error.message = "Failed to write response after end. (Maybe 'send()', 'sendFile()', 'streamFile()' are being called multiple times or you forgot to call 'preventDefault()'?)";
+		Server.warn(error);
 	}
 }
 
