@@ -6,7 +6,7 @@ const path = require("path");
 const util = require("util");
 const url = require("url");
 const fs = require("fs");
-const {EventListenerStatic, EventListener, fixDigits, iterate, getQueryParameters} = require("./JustLib.js");
+const {EventListenerStatic, EventListener, fixDigits, iterate, getQueryParameters, objectDeepMerge} = require("./JustLib.js");
 const {CLI, KEY} = require("./CLI");
 
 const btoa = data => Buffer.from(data, "binary").toString("base64");
