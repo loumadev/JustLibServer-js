@@ -1238,7 +1238,6 @@ class RequestEvent extends EventListener.Event {
 		this.preventDefault();
 		if(this.res.writableEnded) return Server.warn(`Failed to write response after end. ('e.send()'/'e.streamFile()' might be called multiple times)`), false;
 
-		let status = 0;
 		const contentType = getContentType(filePath);
 		const stat = await fs.promises.stat(filePath).catch(() => { });
 		if(!stat || stat.isDirectory()) {
@@ -1250,7 +1249,7 @@ class RequestEvent extends EventListener.Event {
 
 		if(!range) {
 			headers["Content-Length"] = stat.size;
-			this.send(fs.createReadStream(filePath), status = 200, contentType, headers);
+			this.send(fs.createReadStream(filePath), 200, contentType, headers);
 			return true;
 		}
 
@@ -1258,7 +1257,7 @@ class RequestEvent extends EventListener.Event {
 		if(range.start >= stat.size || range.end >= stat.size) {
 			//Send correct range
 			headers["Content-Range"] = `bytes */${stat.size}`;
-			this.send("416 Range Not Satisfiable", status = 416, contentType, headers);
+			this.send("416 Range Not Satisfiable", 416, contentType, headers);
 		} else {
 			//Set up headers
 			headers["Content-Range"] = `bytes ${range.start}-${range.end}/${stat.size}`;
@@ -1267,7 +1266,7 @@ class RequestEvent extends EventListener.Event {
 			//headers["Cache-Control"] = "no-cache";
 
 			//Send part of file
-			this.send(fs.createReadStream(filePath, range), status = 206, contentType, headers);
+			this.send(fs.createReadStream(filePath, range), 206, contentType, headers);
 		}
 		return true;
 	}
