@@ -85,6 +85,37 @@ class Server extends EventListenerStatic {
 	static environment = process.env.NODE_ENV || "development";
 
 	static async begin() {
+		const __on = this.on;
+
+		//Generate regex expression for event handlers
+		this.on = (function(/**@type {string}*/event) {
+			//Create a new event listener
+			const _listener = __on.apply(this, arguments);
+
+			//Create regex from wildcard characters
+			if(["*", "?", ":"].some(e => event.includes(e))) {
+				_listener.regex = new RegExp(
+					"^" //Start of the path
+					+ event
+						.replace(/(\.|\(|\)|\[|\]|\||\{|\}|\+|\^|\$|\/|\-|\\)/g, "\\$1") //Escape special characters
+						.replace(/\?/g, "(.)") //Replace "?" with "any character"
+						.replace(/\*/g, "(.*)") //Replace "*" with "any character(s)"
+						.replace(/:(\w*)/g, (match, name) => { //Replace ":" with "named parameter"
+							if(!name) throw new Error(`Failed to register event handler: Missing parameter name (${event})`);
+							return `(?<${name}>[^/]+?)`;
+						})
+					+ "\/?" //Trailing slash
+					+ "$" //End of the path
+					, "i");
+			} else {
+				//Event does not contain any wildcards or is not a http request handler
+				_listener.regex = null;
+			}
+
+			return _listener;
+		}).bind(this);
+
+
 		/**
 		 * @type {
 				((event: string, listener: (event: RequestEvent) => void) => EventListener.Listener) &
@@ -369,16 +400,6 @@ class Server extends EventListenerStatic {
 				//Event was already dispatched
 				if(searchDispatched.includes(type)) continue;
 
-				//Create regex for each listener
-				if(!("regex" in listener)) {
-					if(["*", "?"].some(e => type.includes(e))) {
-						listener.regex = new RegExp(type.replace(/(\.|\(|\)|\[|\]|\||\{|\}|\+|\^|\$|\/|\-|\\)/g, "\\$1").replace(/\?/g, "(.)").replace(/\*/g, "(.*)"), "i");
-					} else {
-						listener.regex = null;
-						continue;
-					}
-				}
-
 				//Listener uses dynamic representation of destination path
 				if(listener.regex) {
 					const match = destinationPath.match(listener.regex);
@@ -386,8 +407,15 @@ class Server extends EventListenerStatic {
 					//Destination path does not match required pattern
 					if(!match) continue;
 
-					//Add found matches to EventObject and dispatch event
+					//Add found matches to EventObject
+					// @ts-ignore
 					EventObject.matches = match.slice(1);
+					EventObject.matches.matches = EventObject.matches;
+					if(match.groups) {
+						Object.assign(EventObject.matches, match.groups);
+					}
+
+					//Dispatch matched event
 					searchDispatched.push(type);
 					listenerPromises.push(this.dispatchEvent(type, EventObject));
 				}
@@ -893,7 +921,8 @@ class RequestEvent extends EventListener.Event {
 		this.autoPrevent;
 
 		/**
-		 * @type {string[]} Array of matches, if wildcard handler was used
+		 * @type {string[] & {[param: string]: string} & {matches: string[]}} Array of matches, if wildcard handler was used.
+		 * Contains properties named by defined parameters in the event handler with their corresponding matched values.
 		 */
 		this.matches;
 
@@ -1696,11 +1725,12 @@ Server.on("404", e => {
 //There are two special characters available:
 //'*' - extends to /(.*)/ regex (matches 0 or more characters)
 //'?' - extends to /(.)/ regex (matches 1 character)
+//':' - extends to /([^/]+?)/ regex (matches 1 or more characters, until '/')
 //Example: let's say we want format like this: '/user/<user>/<page>' => '/user/john123/profile'
-Server.on("/user/*/*", e => {
+Server.on("/user/:user/:page", e => {
 	//e.matches contains ordered matches from requested url
 	//get 'user' and 'page' from matched url
-	const [user, page] = e.matches;
+	const {user, page} = e.matches;
 
 	if(page == "profile") {
 		//Send user their profile page
@@ -1710,6 +1740,18 @@ Server.on("/user/*/*", e => {
 	}
 
 	//If no response was sent, the 404 status will be sent
+});
+
+//Example: '/file/<username>/<path_to_file>' => '/file/john123/path/to/my/file.txt'
+Server.on("/user/:user/*", e => {
+	const [username, path] = e.matches;
+	//or const {username, matches: [, path]} = e.matches;
+
+	//Query the database to obtain user id
+	const user_id = "213465879";
+
+	//Serve file from fs
+	e.streamFile("/user_content/" + user_id + "/" + path);
 });
 
 //Redirect request to another path
