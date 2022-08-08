@@ -1721,6 +1721,11 @@ Server.on("404", e => {
 	e.send("There's nothing you see here :(");
 });
 
+//Handle 500 Internal Server Error
+Server.on("500", e => {
+	e.send("Something went wrong :/");
+});
+
 //Handle dynamic request
 //There are two special characters available:
 //'*' - extends to /(.*)/ regex (matches 0 or more characters)
