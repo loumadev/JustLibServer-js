@@ -960,7 +960,7 @@ class RequestEvent extends EventListener.Event {
 		this.data = {};
 
 		/**
-		 * @type {Error?} Error thrown by any of the request handlers
+		 * @type {(ObjectLiteral & Error)?} Error thrown by any of the request handlers
 		 */
 		this.error = null;
 
