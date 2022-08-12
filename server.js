@@ -462,10 +462,8 @@ class Server extends EventListenerStatic {
 		const clone = event.clone();
 		clone.error = error;
 
-		//TODO: Maybe add some option to disable this logging? It might be annoying if there is implemented some custom handling.
-		Server.error("Failed to handle the incoming request:", error);
-
 		this.dispatchEvent("500", clone, () => {
+			Server.error("Failed to handle the incoming request:", error);
 			event.send("500 Internal Server Error", 500);
 		});
 	}
