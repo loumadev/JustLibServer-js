@@ -84,11 +84,21 @@ class Server extends EventListenerStatic {
 
 	static environment = process.env.NODE_ENV || "development";
 
-	static async begin() {
+	/**
+	 * @type {
+		((event: string, listener: (event: RequestEvent) => void) => EventListener.Listener) &
+		((event: "request", listener: (event: RequestEvent) => void) => EventListener.Listener) &
+		((event: "load", listener: (event: EventListener.Event) => void) => EventListener.Listener) &
+		((event: "unload", listener: (event: EventListener.Event & {forced: boolean}) => void) => EventListener.Listener) &
+		((event: "404", listener: (event: RequestEvent) => void) => EventListener.Listener) &
+		((event: "500", listener: (event: RequestEvent) => void) => EventListener.Listener)
+	   }
+	 */
+	static on = (() => {
 		const __on = this.on;
 
 		//Generate regex expression for event handlers
-		this.on = (function(/**@type {string}*/event) {
+		return (function(/**@type {string}*/event) {
 			//Create a new event listener
 			const _listener = __on.apply(this, arguments);
 
@@ -114,34 +124,9 @@ class Server extends EventListenerStatic {
 
 			return _listener;
 		}).bind(this);
+	})();
 
-
-		/**
-		 * @type {
-				((event: string, listener: (event: RequestEvent) => void) => EventListener.Listener) &
-				((event: 'request', listener: (event: RequestEvent) => void) => EventListener.Listener) &
-				((event: 'load', listener: (event: EventListener.Event) => void) => EventListener.Listener) &
-				((event: 'unload', listener: (event: EventListener.Event & {forced: boolean}) => void) => EventListener.Listener) &
-				((event: '404', listener: (event: RequestEvent) => void) => EventListener.Listener)
-			}
-		 */
-		this.on;
-
-		// const _originalListener = this.on;
-		// this.on = (...args) => {
-		// 	let type = args[0];
-		// 	let middlewares = args[1];
-		// 	let callback = args[2];
-
-		// 	if(!callback && typeof middlewares === "function") callback = middlewares;
-		// 	else if(callback && typeof middlewares === "function") middlewares = [middlewares];
-		// 	else if(!callback) throw new TypeError("Invalid callback " + callback);
-		// 	else if(!(middlewares instanceof Array)) throw new TypeError("Invalid middlewares: " + middlewares);
-
-		// 	const listener = _originalListener(type, callback);
-		// 	listener.middlewares = middlewares;
-		// };
-
+	static async begin() {
 		//Set up error logging
 		process.on("unhandledRejection", (reason, promise) => {
 			this.error("Unhandled Promise Rejection at:", promise);
