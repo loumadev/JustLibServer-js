@@ -304,8 +304,8 @@ class Server extends EventListenerStatic {
 		const ip = proxyIp || remoteIp;
 		const origin = `${protocol}://${req.headers.host}`;
 		const url = new URL(req.url, origin);
-		const isTrusted = this.TRUSTED_IPS.map(e => ip.includes(e)).includes(true);
-		const isBlacklisted = this.BLACKLIST.map(e => ip.includes(e)).includes(true);
+		const isTrusted = this.TRUSTED_IPS.some(e => ip.includes(e));
+		const isBlacklisted = this.BLACKLIST.some(e => ip.includes(e));
 
 		//Request handling
 		let destinationPath = decodeURIComponent(redirectTo || url.pathname);
