@@ -309,6 +309,7 @@ class Server extends EventListenerStatic {
 
 		//Request handling
 		let destinationPath = decodeURIComponent(redirectTo || url.pathname);
+		const resolvedPath = this.resolvePublicResource(destinationPath);
 
 		/** @type {RequestEvent} */
 		const EventObject = prevEvent || new RequestEvent({
@@ -330,7 +331,7 @@ class Server extends EventListenerStatic {
 			headers: req.headers,
 			isRedirected: false,
 			redirectChain: [destinationPath],
-			resolvedFile: this.resolvePublicResource(destinationPath),
+			resolvedPath: resolvedPath,
 
 			RemoteIP: remoteIp, /* Deprecated */
 			ProxyIP: proxyIp, /* Deprecated */
@@ -338,6 +339,7 @@ class Server extends EventListenerStatic {
 			HOST: (host || ""), /* Deprecated */
 			Path: destinationPath, /* Deprecated */
 			IS_TRUSTED: isTrusted, /* Deprecated */
+			resolvedFile: resolvedPath, /* Deprecated */
 		});
 
 		if(!redirectTo) {
@@ -356,7 +358,8 @@ class Server extends EventListenerStatic {
 			EventObject.isRedirected = true;
 			EventObject.path = destinationPath;
 			EventObject.Path = destinationPath; /* Deprecated */
-			EventObject.resolvedFile = this.resolvePublicResource(destinationPath);
+			EventObject.resolvedPath = resolvedPath;
+			EventObject.resolvedFile = resolvedPath;
 
 			//Reset `Event`'s internal properties
 			EventObject.isStopped = false;
@@ -421,8 +424,11 @@ class Server extends EventListenerStatic {
 			if(!EventObject.defaultPrevented) {
 				if(res.writableEnded) return this.warn(`Failed to write response after end. (Default action has not been prevented)`);
 
+				//The request path might be vulnerable
+				if(!EventObject.resolvedPath) return EventObject.send("404 Not Found", 404);
+
 				//Serve static file. This call will internally respond with 404 if file is not found.
-				EventObject.streamFile(EventObject.resolvedFile);
+				EventObject.streamFile(EventObject.resolvedPath);
 			}
 		}).catch(err => {
 			//Catch all errors and process them
@@ -459,8 +465,33 @@ class Server extends EventListenerStatic {
 		});
 	}
 
+	/**
+	 * Resolves the absolute path of a file inside the specified base directory.
+	 * @static
+	 * @param {string} baseDirectory Base directory to act as root
+	 * @param {string} filePath File path to resolve from base directory
+	 * @return {string | null} Resolved resource absolute path. Returns `null` if path cannot be resolved (potentially vulnerable).
+	 * @memberof Server
+	 */
+	static resolveResource(baseDirectory, filePath) {
+		//Normalize the input parameters
+		const base = path.normalize(baseDirectory);
+		const resource = path.normalize(filePath);
+
+		//Poision null bytes prevention
+		if(resource.indexOf("\0") !== -1) return null;
+
+		//Resolve file path
+		const resolved = path.resolve(path.join(base, resource));
+
+		//Directory traversal prevention
+		if(!resolved.startsWith(path.normalize(base))) return null;
+
+		return resolved;
+	}
+
 	static resolvePublicResource(filePath) {
-		return path.join(PATH.PUBLIC, filePath);
+		return this.resolveResource(PATH.PUBLIC, filePath);
 	}
 
 	static readRangeHeader(req, totalLength) {
@@ -985,7 +1016,13 @@ class RequestEvent extends EventListener.Event {
 		this.error = null;
 
 		/**
-		 * @type {string} Resolved path to requested file in local file system
+		 * @type {string?} Resolved path to requested file or directory in local file system. Can contain `null` value, in case the resource cannot be resolved.
+		 */
+		this.resolvedPath;
+
+		/**
+		 * @deprecated Use 'resolvedResource' instead
+		 * @type {string?} Resolved path to requested file in local file system
 		 */
 		this.resolvedFile;
 
