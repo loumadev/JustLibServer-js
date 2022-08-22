@@ -296,16 +296,16 @@ class Server extends EventListenerStatic {
 	static _handleRequest(req, res, redirectTo = null, prevEvent = null) {
 		if(redirectTo && !prevEvent) throw new TypeError("Cannot redirect request if there is no RequestEvent provided");
 
-		const _remoteAdd = req.socket.remoteAddress;
-		const RemoteIP = _remoteAdd.split(":")[3] || _remoteAdd;
-		const ProxyIP = req.headers["x-forwarded-for"];
+		const _remoteAdd = req.socket.remoteAddress || "";
+		const remoteIp = _remoteAdd.split(":")[3] || _remoteAdd;
+		const proxyIp = req.headers["x-forwarded-for"];
 		const protocol = req.headers["x-forwarded-proto"] || "http";
-		const HOST = req.headers["host"];
-		const IP = ProxyIP || RemoteIP;
+		const host = req.headers["host"];
+		const ip = proxyIp || remoteIp;
 		const origin = `${protocol}://${req.headers.host}`;
 		const url = new URL(req.url, origin);
-		const IS_TRUSTED = this.TRUSTED_IPS.map(e => IP.includes(e)).includes(true);
-		const IS_BLACKLISTED = this.BLACKLIST.map(e => IP.includes(e)).includes(true);
+		const isTrusted = this.TRUSTED_IPS.map(e => ip.includes(e)).includes(true);
+		const isBlacklisted = this.BLACKLIST.map(e => ip.includes(e)).includes(true);
 
 		//Request handling
 		let destinationPath = decodeURIComponent(redirectTo || url.pathname);
@@ -315,32 +315,37 @@ class Server extends EventListenerStatic {
 			req,
 			res,
 			method: req.method,
-			RemoteIP,
-			ProxyIP,
-			IP,
-			host: (HOST || ""),
-			HOST: (HOST || ""), /* Deprecated */
+			remoteIp: remoteIp,
+			proxyIp: proxyIp,
+			ip: ip,
+			host: (host || ""),
 			origin: origin,
 			protocol,
 			path: destinationPath,
-			Path: destinationPath, /* Deprecated */
 			query: Object.fromEntries(url.searchParams.entries()),
 			url: url,
-			IS_TRUSTED,
+			isTrusted: isTrusted,
 			defaultPreventable: true,
 			autoPrevent: true,
 			headers: req.headers,
 			isRedirected: false,
 			redirectChain: [destinationPath],
-			resolvedFile: this.resolvePublicResource(destinationPath)
+			resolvedFile: this.resolvePublicResource(destinationPath),
+
+			RemoteIP: remoteIp, /* Deprecated */
+			ProxyIP: proxyIp, /* Deprecated */
+			IP: ip, /* Deprecated */
+			HOST: (host || ""), /* Deprecated */
+			Path: destinationPath, /* Deprecated */
+			IS_TRUSTED: isTrusted, /* Deprecated */
 		});
 
 		if(!redirectTo) {
-			if(IS_TRUSTED) this.log(`§2Incoming request from ${HOST ? `§2(${HOST})` : ""}§2${RemoteIP}${ProxyIP ? `§3(${ProxyIP})` : ""}§2: §2${req.method} §2${req.url}`);
-			else this.log(`§2Incoming request from ${HOST ? `§2(${HOST})` : ""}§a${RemoteIP}${ProxyIP ? `§b(${ProxyIP})` : ""}§2: §a${req.method} §a${req.url}`);
+			if(isTrusted) this.log(`§2Incoming request from ${host ? `§2(${host})` : ""}§2${remoteIp}${proxyIp ? `§3(${proxyIp})` : ""}§2: §2${req.method} §2${req.url}`);
+			else this.log(`§2Incoming request from ${host ? `§2(${host})` : ""}§a${remoteIp}${proxyIp ? `§b(${proxyIp})` : ""}§2: §a${req.method} §a${req.url}`);
 
-			if(IS_BLACKLISTED) {
-				this.warn(`Received request from blacklisted IP (${IP})`);
+			if(isBlacklisted) {
+				this.warn(`Received request from blacklisted IP (${ip})`);
 				return EventObject.send("403 Forbidden", 403);
 			}
 		}
@@ -843,14 +848,32 @@ class RequestEvent extends EventListener.Event {
 		/**
 		 * @type {string} Remote IP address
 		 */
+		this.remoteIp;
+
+		/**
+		 * @deprecated Use `remoteIp` instead
+		 * @type {string} Remote IP address
+		 */
 		this.RemoteIP;
 
 		/**
 		 * @type {string} Forwarded IP address
 		 */
+		this.proxyIp;
+
+		/**
+		 * @deprecated Use `proxyIp` instead
+		 * @type {string} Forwarded IP address
+		 */
 		this.ProxyIP;
 
 		/**
+		 * @type {string} IP address of the client
+		 */
+		this.ip;
+
+		/**
+		 * @deprecated Use `ip` instead
 		 * @type {string} IP address of the client
 		 */
 		this.IP;
@@ -895,6 +918,17 @@ class RequestEvent extends EventListener.Event {
 		this.query;
 
 		/**
+		 * @type {URL} Parsed request URL
+		 */
+		this.url;
+
+		/**
+		 * @type {boolean} Tells if the request comes from trusted origin
+		 */
+		this.isTrusted;
+
+		/**
+		 * @deprecated Use 'isTrusted' instead
 		 * @type {boolean} Tells if the request comes from trusted origin
 		 */
 		this.IS_TRUSTED;
