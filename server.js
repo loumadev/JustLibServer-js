@@ -4,7 +4,6 @@ const formidable = require("formidable");
 const http = require("http");
 const path = require("path");
 const util = require("util");
-const url = require("url");
 const fs = require("fs");
 const {EventListenerStatic, EventListener, fixDigits, iterate, getQueryParameters, objectDeepMerge} = require("./JustLib.js");
 const {CLI, KEY} = require("./CLI");
@@ -303,12 +302,13 @@ class Server extends EventListenerStatic {
 		const protocol = req.headers["x-forwarded-proto"] || "http";
 		const HOST = req.headers["host"];
 		const IP = ProxyIP || RemoteIP;
-		const URL = url.parse(req.url, true);
+		const origin = `${protocol}://${req.headers.host}`;
+		const url = new URL(req.url, origin);
 		const IS_TRUSTED = this.TRUSTED_IPS.map(e => IP.includes(e)).includes(true);
 		const IS_BLACKLISTED = this.BLACKLIST.map(e => IP.includes(e)).includes(true);
 
 		//Request handling
-		let destinationPath = decodeURIComponent(redirectTo || URL.pathname);
+		let destinationPath = decodeURIComponent(redirectTo || url.pathname);
 
 		/** @type {RequestEvent} */
 		const EventObject = prevEvent || new RequestEvent({
@@ -320,11 +320,12 @@ class Server extends EventListenerStatic {
 			IP,
 			host: (HOST || ""),
 			HOST: (HOST || ""), /* Deprecated */
-			origin: `${protocol}://${req.headers.host}`,
+			origin: origin,
 			protocol,
 			path: destinationPath,
 			Path: destinationPath, /* Deprecated */
-			query: URL.query,
+			query: Object.fromEntries(url.searchParams.entries()),
+			url: url,
 			IS_TRUSTED,
 			defaultPreventable: true,
 			autoPrevent: true,
