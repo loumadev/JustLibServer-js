@@ -1071,9 +1071,13 @@ class RequestEvent extends EventListener.Event {
 		else if(!(middlewares instanceof Array)) throw new TypeError("'middlewares' parameter is not type of function[]");
 
 		const executor = (middlewares, i = 0) => {
-			return () => {
-				if(i == middlewares.length) callback(this.query);
-				else middlewares[i](this, executor(middlewares, i + 1));
+			return async () => {
+				try {
+					if(i == middlewares.length) await callback(this.query);
+					else await middlewares[i](this, executor(middlewares, i + 1));
+				} catch(err) {
+					Server._handleInternalError(this, err);
+				}
 			};
 		};
 
@@ -1141,7 +1145,12 @@ class RequestEvent extends EventListener.Event {
 		if(this.req.method == "OPTIONS") {
 			if(this.autoPrevent) this.defaultPrevented = true;
 
-			callback(this.query);
+			(async () => {
+				await callback(this.query);
+			})().catch(err => {
+				Server._handleInternalError(this, err);
+			});
+
 			return true;
 		} else return false;
 
