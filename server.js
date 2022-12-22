@@ -65,6 +65,21 @@ class Server extends EventListenerStatic {
 	};
 
 	/**
+	 * HTTP server instance
+	 * @type {http.Server}
+	 */
+	static http;
+
+	/**
+	 *
+	 *
+	 * @static
+	 * @type {import("./ssh").SSHServer}
+	 * @memberof Server
+	 */
+	static ssh = null;
+
+	/**
 	 * Controls logging of the unknown command error.
 	 * In case you are using `input` event only on `Server.stdio.cli` (and not using `command` event),
 	 * you may want to set this to `false`, so server won't show error every time you input something
@@ -194,6 +209,25 @@ class Server extends EventListenerStatic {
 					}).catch(err => {
 						this.log(`§c[ERROR]: ${err.message}`);
 					});
+				} else if(command == "who") {
+					e.preventDefault();
+
+					if(!this.ssh) return this.error("SSH server is not enabled!");
+
+					const connections = this.ssh.connections;
+
+					if(connections.length == 0) return this.log("No connections");
+
+					this.log(`Active connections(${connections.length}):`);
+
+					const maxUsername = connections.reduce((max, connection) => Math.max(max, connection.username.length), 0);
+					const maxDate = connections.reduce((max, connection) => Math.max(max, connection.date.toISOString().replace("T", " ").slice(0, 19).length), 0);
+					const maxIP = connections.reduce((max, connection) => Math.max(max, connection.ip.length), 0);
+
+					for(const connection of connections) {
+						this.log(`${connection.username.padEnd(maxUsername)}  ${connection.ip.padEnd(maxIP)}  ${connection.date.toISOString().replace("T", " ").slice(0, 19).padEnd(maxDate)}`);
+					}
+
 				} else if(command == "") {
 
 				} else return;
@@ -212,6 +246,31 @@ class Server extends EventListenerStatic {
 				fs.appendFileSync("stdout.log", string);
 			});*/
 			this.log("§7CLI enabled");
+
+			//SSH Server
+			if(this.config["ssh"]["enabled"]) {
+				//Try to load optional SSH module
+				try {
+					this.log("§7Loading SSH module...");
+					var {SSHServer} = (this.__CommonJS_cache["ssh.js"] = require("./ssh"));
+
+					//If module loaded, create new SSH server
+					this.log("§7Enabling SSH server...");
+					this.ssh = new SSHServer({
+						localCLI: this.stdio.cli,
+						port: this.config["ssh"]["port"]
+					});
+					await this.ssh.begin();
+
+					this.on("unload", () => {
+						this.ssh.stop();
+					});
+
+					this.log("§7SSH server enabled");
+				} catch(err) {
+					this.error("Failed to load SSH module: " + err.message);
+				}
+			}
 		} else this.log(`§7CLI disabled`);
 
 		//Init
@@ -288,13 +347,20 @@ class Server extends EventListenerStatic {
 	 * @static
 	 * @param {http.IncomingMessage} req
 	 * @param {http.ServerResponse} res
-	 * @param {string} [redirectTo=null]
-	 * @param {RequestEvent} [prevEvent=null]
+	 * @param {string | undefined} [redirectTo]
+	 * @param {RequestEvent} [prevEvent]
 	 * @return {void} 
 	 * @memberof Server
 	 */
-	static _handleRequest(req, res, redirectTo = null, prevEvent = null) {
+	static _handleRequest(req, res, redirectTo = undefined, prevEvent = undefined) {
 		if(redirectTo && !prevEvent) throw new TypeError("Cannot redirect request if there is no RequestEvent provided");
+
+		//Handle invalid requests
+		if(!req.url) {
+			res.writeHead(400);
+			res.end("400 Bad Request");
+			return this._connectionLog(400);
+		}
 
 		const _remoteAdd = req.socket.remoteAddress || "";
 		const remoteIp = _remoteAdd.split(":")[3] || _remoteAdd;
@@ -303,7 +369,14 @@ class Server extends EventListenerStatic {
 		const host = req.headers["host"];
 		const ip = proxyIp || remoteIp;
 		const origin = `${protocol}://${req.headers.host}`;
-		const url = new URL(req.url, origin);
+		try {
+			var url = new URL(req.url, origin);
+		} catch(err) {
+			res.writeHead(400);
+			res.end("400 Bad Request");
+			this.warn(`§cInvalid URL '${req.url}':`, err);
+			return this._connectionLog(400);
+		}
 		const isTrusted = this.TRUSTED_IPS.some(e => ip.includes(e));
 		const isBlacklisted = this.BLACKLIST.some(e => ip.includes(e));
 
@@ -769,6 +842,9 @@ class Server extends EventListenerStatic {
 		const message = `\x1b[31m${Server.formatTime()} [ERROR]: ${formattedArgs}\x1b[0m`;
 		console.error(message);
 	}
+
+	//Cache to store loaded optional CommonJS modules
+	static __CommonJS_cache = {};
 }
 
 /**
@@ -1111,9 +1187,13 @@ class RequestEvent extends EventListener.Event {
 		if(typeof callback !== "function") throw new TypeError("'callback' parameter must be type of function");
 
 		const executor = (middlewares, i = 0) => {
-			return () => {
-				if(i == middlewares.length) callback(this.body, this.bodyRaw);
-				else middlewares[i](this, executor(middlewares, i + 1));
+			return async () => {
+				try {
+					if(i == middlewares.length) await callback(this.body, this.bodyRaw);
+					else await middlewares[i](this, executor(middlewares, i + 1));
+				} catch(err) {
+					Server._handleInternalError(this, err);
+				}
 			};
 		};
 
@@ -1737,6 +1817,10 @@ const DEFAULT_CONFIG = {
 	"login": {
 		"username": "admin",
 		"password": "admin"
+	},
+	"ssh": {
+		"enabled": false,
+		"port": 22
 	}
 };
 
