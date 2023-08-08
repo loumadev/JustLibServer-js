@@ -16,7 +16,8 @@ const PATH = {
 	TRUSTED_IPS: __dirname + "/trustedips.json",
 	BLACKLIST: __dirname + "/blacklist.json",
 	MODULES: __dirname + "/modules/",
-	PUBLIC: __dirname + "/public/"
+	PUBLIC: __dirname + "/public/",
+	LOGS: __dirname + "/logs/"
 };
 
 /**
@@ -98,6 +99,9 @@ class Server extends EventListenerStatic {
 
 	static environment = process.env.NODE_ENV || "development";
 
+	/** @type {fs.WriteStream | null} */
+	static loggerStream = null;
+
 	/**
 	 * @type {
 		((event: string, listener: (event: RequestEvent) => void) => EventListener.Listener) &
@@ -141,6 +145,12 @@ class Server extends EventListenerStatic {
 	})();
 
 	static async begin() {
+		//Set up logger
+		const filename = this.getFileNameFromDate(new Date());
+		const filepath = path.join(PATH.LOGS, `${filename}.log`);
+		if(!fs.existsSync(PATH.LOGS)) fs.mkdirSync(PATH.LOGS);
+		this.loggerStream = fs.createWriteStream(filepath, {flags: "a"});
+
 		//Set up error logging
 		process.on("unhandledRejection", (reason, promise) => {
 			this.error("Unhandled Promise Rejection at:", promise);
@@ -155,6 +165,11 @@ class Server extends EventListenerStatic {
 		this._loadTrustedIPs();
 		this._loadBlacklist();
 		this.log("§7Properties loaded");
+
+		if(!this.config["enable-logging"]) {
+			this.loggerStream.end();
+			this.log("§eLogging is disabled!");
+		}
 
 		//CLI
 		if(this.config["enable-cli"]) {
@@ -338,7 +353,9 @@ class Server extends EventListenerStatic {
 		this._saveBlacklist();
 
 		this.dispatchEvent("unload", {forced: force, async: true}).then(() => {
-			process.exit(code);
+			this.log("§cServer stopped");
+			if(this.loggerStream) this.loggerStream.end(() => process.exit(code));
+			else process.exit(code);
 		});
 	}
 
@@ -791,6 +808,20 @@ class Server extends EventListenerStatic {
 	}
 
 	/**
+	 * @static
+	 * @param {Date} date
+	 * @return {string} 
+	 * @memberof Instagram
+	 */
+	static getFileNameFromDate(date) {
+		const offset = -date.getTimezoneOffset();
+		const sign = offset < 0 ? "-" : "+";
+		const d = new Date(date.getTime() + offset * 60 * 1000).toISOString();
+
+		return d.replace(/:/g, "-").replace(/\.\d+/, "") + sign + fixDigits(offset / 60);
+	}
+
+	/**
 	 * Sets the title of console window.
 	 * @static
 	 * @param {string} [title="Node.js Server - " + __filename]
@@ -813,6 +844,7 @@ class Server extends EventListenerStatic {
 		const formattedArgs = Server.formatArguments(args, {colors: true, depth: 4});
 		const message = `${Server.formatTime()} ${formattedArgs}`;
 		console.log(message);
+		Server.loggerStream?.write(`${Server._unescape(message)}\n`);
 	}
 
 	/**
@@ -827,6 +859,7 @@ class Server extends EventListenerStatic {
 		const formattedArgs = Server.formatArguments(args, {colors: false, depth: 4});
 		const message = `\x1b[33m${Server.formatTime()} [WARN]: ${formattedArgs}\x1b[0m`;
 		console.warn(message);
+		Server.loggerStream?.write(`${Server._unescape(message)}\n`);
 	}
 
 	/**
@@ -841,6 +874,18 @@ class Server extends EventListenerStatic {
 		const formattedArgs = Server.formatArguments(args, {colors: false, depth: 4});
 		const message = `\x1b[31m${Server.formatTime()} [ERROR]: ${formattedArgs}\x1b[0m`;
 		console.error(message);
+		Server.loggerStream?.write(`${Server._unescape(message)}\n`);
+	}
+
+	/**
+	 * Removes all color codes from string.
+	 * @static
+	 * @param {string} string
+	 * @return {string} 
+	 * @memberof Server
+	 */
+	static _unescape(string) {
+		return string.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
 	}
 
 	//Cache to store loaded optional CommonJS modules
@@ -1812,6 +1857,7 @@ CookieJar.Cookie = class Cookie {
 const DEFAULT_CONFIG = {
 	"http-port": 80,
 	"enable-http-server": true,
+	"enable-logging": true,
 	"enable-cli": true,
 	"debug": true,
 	"login": {
