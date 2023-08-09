@@ -33,7 +33,11 @@ class Server extends EventListenerStatic {
 
 	/**
 	 * @typedef {Object} Module
+	 * @prop {string} name Name of the module
+	 * @prop {string | null} project Name of the project the module belongs to; `null` if module is not part of any project
+	 * @prop {string} path Path to the module file
 	 * @prop {boolean} loaded Flag indicating if the module has been loaded
+	 * @prop {boolean} failed Flag indicating if the module failed to load
 	 * @prop {any} exports The exports of the module
 	 */
 
@@ -41,7 +45,7 @@ class Server extends EventListenerStatic {
 	 * Title of the server terminal window
 	 * @type {string}
 	 */
-	static title = null;
+	static title = "";
 
 	/**
 	 * Cache of loaded modules.
@@ -53,7 +57,7 @@ class Server extends EventListenerStatic {
 	/**
 	 * Server standard input/output
 	 * @static
-	 * @type {{cli: CLI, settings: {logs: boolean, warnings: boolean, errors: boolean}}} obj1
+	 * @type {{cli: CLI | null, settings: {logs: boolean, warnings: boolean, errors: boolean}}} obj1
 	 * @memberof Server
 	 */
 	static stdio = {
@@ -75,7 +79,7 @@ class Server extends EventListenerStatic {
 	 *
 	 *
 	 * @static
-	 * @type {import("./ssh").SSHServer}
+	 * @type {import("./ssh").SSHServer | null}
 	 * @memberof Server
 	 */
 	static ssh = null;
@@ -88,15 +92,36 @@ class Server extends EventListenerStatic {
 	 */
 	static unknownCommandError = true;
 
+	/**
+	 * List of trusted IP addresses
+	 * @type {string[]}
+	 */
 	static TRUSTED_IPS = [];
+
+	/**
+	 * List of blacklisted IP addresses
+	 * @type {string[]}
+	 */
 	static BLACKLIST = [];
+
+	/**
+	 * @type {typeof PATH}
+	 */
 	static PATH = PATH;
 
+	/**
+	 * Flag indicating if the server is stopping
+	 * @type {boolean}
+	 */
 	static isStopping = false;
 
+	/** @type {string} */
 	static __dirname = __dirname;
+
+	/** @type {string} */
 	static __filename = __filename;
 
+	/** @type {string | "development"} */
 	static environment = process.env.NODE_ENV || "development";
 
 	/** @type {fs.WriteStream | null} */
@@ -144,6 +169,10 @@ class Server extends EventListenerStatic {
 		}).bind(this);
 	})();
 
+	/**
+	 * @static
+	 * @memberof Server
+	 */
 	static async begin() {
 		//Set up logger
 		const filename = this.getFileNameFromDate(new Date());
@@ -207,20 +236,20 @@ class Server extends EventListenerStatic {
 						this._saveBlacklist();
 					} else this.log(`§c[ERROR]: Provided IP address is not banned`);
 				} else if(command == "banlist") {
-					this.log(`Blacklisted IPs(${this.BLACKLIST.length}):\n` + this.BLACKLIST.join("\n"));
+					this.log(`Blacklisted IPs(${this.BLACKLIST.length}):\n${this.BLACKLIST.join("\n")}`);
 				} else if(command == "eval") {
 					try {
 						e.preventDefault();
 						this.log(util.formatWithOptions({colors: true}, "< %O", await eval(args.join(" "))));
 					} catch(e) {
-						this.log(`[EVAL ERROR]: ` + (e?.message || `Unknown error (${e?.message})`));
+						this.log(`[EVAL ERROR]: ${e?.message || `Unknown error (${e?.message})`}`);
 					}
 				} else if(command == "exec") {
 					const [filePath = "autoexec.cfg"] = args;
 
 					fs.promises.readFile(path.join(__dirname, filePath)).then(file => {
 						Server.log(`Executing ${filePath}...`);
-						this.stdio.cli.sendInput(file.toString());
+						this.stdio.cli?.sendInput(file.toString());
 					}).catch(err => {
 						this.log(`§c[ERROR]: ${err.message}`);
 					});
@@ -278,7 +307,7 @@ class Server extends EventListenerStatic {
 					await this.ssh.begin();
 
 					this.on("unload", () => {
-						this.ssh.stop();
+						this.ssh?.stop();
 					});
 
 					this.log("§7SSH server enabled");
@@ -386,6 +415,9 @@ class Server extends EventListenerStatic {
 		const host = req.headers["host"];
 		const ip = proxyIp || remoteIp;
 		const origin = `${protocol}://${req.headers.host}`;
+		const isTrusted = this.TRUSTED_IPS.some(e => ip.includes(e));
+		const isBlacklisted = this.BLACKLIST.some(e => ip.includes(e));
+
 		try {
 			var url = new URL(req.url, origin);
 		} catch(err) {
@@ -394,8 +426,6 @@ class Server extends EventListenerStatic {
 			this.warn(`§cInvalid URL '${req.url}':`, err);
 			return this._connectionLog(400);
 		}
-		const isTrusted = this.TRUSTED_IPS.some(e => ip.includes(e));
-		const isBlacklisted = this.BLACKLIST.some(e => ip.includes(e));
 
 		//Request handling
 		let destinationPath = decodeURIComponent(redirectTo || url.pathname);
@@ -580,18 +610,33 @@ class Server extends EventListenerStatic {
 		return resolved;
 	}
 
+	/**
+	 * Resolves the absolute path of a file inside the public folder.
+	 * @static
+	 * @param {string} filePath Path to teh file located in public folder
+	 * @return {string | null} Resolved absolute path to the file or `null` if path cannot be resolved (potentially vulnerable).
+	 * @memberof Server
+	 */
 	static resolvePublicResource(filePath) {
 		return this.resolveResource(PATH.PUBLIC, filePath);
 	}
 
+	/**
+	 * Parses a range header from the request object and returns the range object.
+	 * @static
+	 * @param {http.IncomingMessage} req
+	 * @param {number} totalLength
+	 * @return {{start: number, end: number} | null} 
+	 * @memberof Server
+	 */
 	static readRangeHeader(req, totalLength) {
 		const header = req.headers["range"];
-
 		if(!header) return null;
 
 		const array = header.split(/bytes=([0-9]*)-([0-9]*)/);
 		const start = parseInt(array[1]);
 		const end = parseInt(array[2]);
+
 		const range = {
 			start: isNaN(start) ? 0 : start,
 			end: isNaN(end) ? (totalLength - 1) : end
@@ -610,10 +655,22 @@ class Server extends EventListenerStatic {
 		return range;
 	}
 
+	/**
+	 * Logs a connection status to the console
+	 * @static
+	 * @param {number} status
+	 * @memberof Server
+	 */
 	static _connectionLog(status) {
 		this.log(`§8Connection closed (${status})`);
 	}
 
+	/**
+	 * Loads the configuration file
+	 * @private
+	 * @static
+	 * @memberof Server
+	 */
 	static _loadConfig() {
 		this.log("§7Loading configuration...");
 		const name = path.basename(PATH.CONFIG);
@@ -642,11 +699,17 @@ class Server extends EventListenerStatic {
 		this.log("§7Configuration loaded");
 	}
 
+	/**
+	 * Loads the server modules
+	 * @private
+	 * @static
+	 * @memberof Server
+	 */
 	static _loadModules() {
 		this.log("§7Loading modules...");
 		const dirname = path.basename(path.dirname(PATH.MODULES + " "));
 
-		//Create default
+		// Create default module
 		if(!fs.existsSync(PATH.MODULES)) {
 			this.log(`§7Creating new empty §f${dirname} §7folder...`);
 			fs.mkdirSync(PATH.MODULES);
@@ -654,43 +717,73 @@ class Server extends EventListenerStatic {
 			fs.writeFileSync(PATH.MODULES + "main.js", DEFAULT_MAIN);
 		}
 
-		//Load modules
+		// Collect all module files
 		const files = getAllFiles(PATH.MODULES, 1);
 		const start = Date.now();
 
 		for(const file of files) {
-			let project = path.basename(path.dirname(file)); if(project == dirname) project = null;
+			// Precompute names
+			const basename = path.basename(path.dirname(file));
 			const filename = path.basename(file);
-			const moduleName = (project ? project + "/" : "") + filename;
 
-			//Skip not '*.js' files
-			if(fs.lstatSync(file).isDirectory() || !file.endsWith(".js")) continue;
+			// Determine module and project name
+			const project = basename == dirname ? null : basename;
+			const moduleName = (project ? `${project}/` : "") + filename;
 
 			//Skip files prefixed with '-'
 			if(filename.startsWith("-")) continue;
 
+			//Skip not '*.js' files
+			if(!file.endsWith(".js") || fs.lstatSync(file).isDirectory()) continue;
+
+			// Create a module object
+			const _module = {
+				name: moduleName,
+				project: project,
+				path: file,
+				loaded: false,
+				failed: false,
+				exports: undefined
+			};
+			this.modules[moduleName] = _module;
+
 			//Execute file
 			try {
+				// Load the module
 				const start = Date.now();
-				this.modules[moduleName] = {
-					loaded: true,
-					exports: require(file)
-				};
+				_module.exports = require(file);
 				const duration = Date.now() - start;
-				const color = [[500, "§4"], [250, "§6"], [-1, "§2"]].find(e => duration > e[0])[1];
-				this.log(`§7Loaded §f${project ? project + "§7:§f" : ""}${filename} §7(${color}+${duration}ms§7)`);
-			} catch(e) {
-				this.modules[moduleName] = {
-					loaded: false,
-					exports: undefined
-				};
-				this.error(`Failed to load '${filename}':`, e);
+
+				// Mark module as loaded
+				_module.loaded = true;
+
+				// Log the success message
+				const color = [
+					{limit: 500, color: "§4"},
+					{limit: 250, color: "§6"},
+					{limit: -1, color: "§2"}
+				].find(e => duration > e.limit)?.color || "§2";
+
+				this.log(`§7Loaded §f${project ? `${project}§7:§f` : ""}${filename} §7(${color}+${duration}ms§7)`);
+			} catch(err) {
+				// Mark module as failed
+				_module.failed = true;
+
+				// Log the error message
+				this.error(`Failed to load '${filename}':`, err);
 			}
 		}
 
+		// Log total stats
 		this.log(`§7Loaded §f${Object.values(this.modules).filter(e => e.loaded).length}§7/§f${Object.values(this.modules).length} §7modules (§f${Date.now() - start}ms§7)`);
 	}
 
+	/**
+	 * Loads the list of trusted IPs
+	 * @private
+	 * @static
+	 * @memberof Server
+	 */
 	static _loadTrustedIPs() {
 		this.log("§7Loading trusted IPs...");
 		const name = path.basename(PATH.TRUSTED_IPS);
@@ -707,6 +800,12 @@ class Server extends EventListenerStatic {
 		this.log(`§7Loaded §f${this.TRUSTED_IPS.length} §7trusted IPs`);
 	}
 
+	/**
+	 * Loads the list of blacklisted IPs
+	 * @private
+	 * @static
+	 * @memberof Server
+	 */
 	static _loadBlacklist() {
 		this.log("§7Loading blacklist...");
 		const name = path.basename(PATH.BLACKLIST);
@@ -723,6 +822,12 @@ class Server extends EventListenerStatic {
 		this.log(`§7Loaded §f${this.BLACKLIST.length} §7blacklisted IPs`);
 	}
 
+	/**
+	 * Saves the list of blacklisted IPs
+	 * @private
+	 * @static
+	 * @memberof Server
+	 */
 	static _saveBlacklist() {
 		this.log("§7Saving blacklist...");
 		const name = path.basename(PATH.BLACKLIST);
@@ -742,30 +847,20 @@ class Server extends EventListenerStatic {
 	/**
 	 * Format a string with color codes.
 	 * @static
-	 * @param {string} msg
-	 * @return {string} 
+	 * @param {string} msg Message to format
+	 * @return {string} Formatted message
 	 * @memberof Server
 	 */
 	static formatMessage(msg) {
 		const codes = ["30", "34", "32", "36", "31", "35", "33", "37", "90", "94", "92", "96", "91", "95", "93", "97"];
-		const message = (msg + "§r§7").replace(/§r/g, "\x1b[0m");
 
-		const arr = message.split("§");
-		let formatted = arr[0];
-
-		if(arr.length > 1) {
-			arr.shift();
-			for(let i = 0; i < arr.length; i++) {
-				const match = arr[i].match(/^[0-9a-f]/);
-
-				if(match) formatted += `\x1b[${codes[parseInt(match[0], 16)]}m${arr[i].substr(1)}`;
-				else continue;
-			}
-		} else {
-			return message;
-		}
-
-		return formatted;
+		return (msg + "§r§7")
+			.replace(/(?<!§)§([0-9a-fr])/gi, (m, c) =>
+				({
+					"r": "\x1b[0m"
+				})[c] || `\x1b[${codes[parseInt(c, 16)]}m`
+			)
+			.replace(/§§/g, "§");
 	}
 
 	/**
@@ -782,17 +877,15 @@ class Server extends EventListenerStatic {
 	}) {
 		const params = [];
 		const format = args.map(arg => {
-			if(typeof arg === "string") {
-				if(options.colors) return this.formatMessage(arg);
-				else return arg.replace(/§[0-9a-f]/g, "");
-			} else {
-				params.push(arg);
-				return "%O";
-			}
-		}).join(" ");
-		const message = util.formatWithOptions(options, format, ...params);
+			if(typeof arg === "string") return options.colors ?
+				this.formatMessage(arg) :
+				arg.replace(/§[0-9a-f]/g, "");
 
-		return message;
+			params.push(arg);
+			return "%O";
+		}).join(" ");
+
+		return util.formatWithOptions(options, format, ...params);
 	}
 
 	/**
@@ -824,12 +917,12 @@ class Server extends EventListenerStatic {
 	/**
 	 * Sets the title of console window.
 	 * @static
-	 * @param {string} [title="Node.js Server - " + __filename]
+	 * @param {string} [title=`Node.js Server - ${__filename}`]
 	 * @memberof Server
 	 */
-	static setTitle(title = "Node.js Server - " + __filename) {
+	static setTitle(title = `Node.js Server - ${__filename}`) {
 		this.title = title;
-		(process.stdout.__write || process.stdout.write).apply(process.stdout, [`${String.fromCharCode(27)}]0;${title}${String.fromCharCode(7)}`]);
+		(process.stdout["__write"] || process.stdout.write).apply(process.stdout, [`${String.fromCharCode(27)}]0;${title}${String.fromCharCode(7)}`]);
 	}
 
 	/**
@@ -929,6 +1022,30 @@ class RequestEvent extends EventListener.Event {
 	 */
 
 	/**
+	 * @typedef {string | number | ObjectLiteral | any[] | boolean | null | undefined} POSTJSONBody 
+	 */
+
+	/**
+	 * @typedef {string} POSTTextBody
+	 */
+
+	/**
+	 * @typedef {ObjectLiteral} POSTFormBody
+	 */
+
+	/**
+	 * @typedef {Buffer} POSTRawBody
+	 */
+
+	/**
+	 * @typedef {POSTMultipartBody | POSTJSONBody | POSTTextBody | POSTFormBody | POSTRawBody} POSTBody
+	 */
+
+	/**
+	 * @typedef {"json" | "json-object" | "json-array" | "form" | "multipart" | "text" | "raw"} POSTBodyType 
+	 */
+
+	/**
 	 * @typedef {
 			((callback: RequestCallbackGET) => boolean) &
 			((middleware: MiddlewareCallback, callback: RequestCallbackGET) => boolean) &
@@ -938,23 +1055,32 @@ class RequestEvent extends EventListener.Event {
 
 	/**
 	 * @typedef {
-			((callback: (bodyParsed: string | ObjectLiteral, bodyBuffer: Buffer) => void) => boolean) &
-			((callback: (bodyParsed: string, bodyBuffer: Buffer) => void, type: "text") => boolean) &
-			((callback: (bodyParsed: ObjectLiteral, bodyBuffer: Buffer) => void, type: "json" | "form") => boolean) &
+			((callback: (bodyParsed: POSTBody, bodyBuffer: Buffer) => void) => boolean) &
+			((callback: (bodyParsed: POSTTextBody, bodyBuffer: Buffer) => void, type: "text") => boolean) &
+			((callback: (bodyParsed: POSTJSONBody, bodyBuffer: Buffer) => void, type: "json") => boolean) &
+			((callback: (bodyParsed: ObjectLiteral, bodyBuffer: Buffer) => void, type: "json-object") => boolean) &
+			((callback: (bodyParsed: Array<any>, bodyBuffer: Buffer) => void, type: "json-array") => boolean) &
+			((callback: (bodyParsed: POSTFormBody, bodyBuffer: Buffer) => void, type: "form") => boolean) &
 			((callback: (bodyParsed: POSTMultipartBody) => void, type: "multipart") => boolean) &
-			((callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean) &
+			((callback: (bodyParsed: POSTRawBody, bodyBuffer: Buffer) => void, type: "raw") => boolean) &
 
-			((middleware: MiddlewareCallback, callback: (bodyParsed: string | ObjectLiteral, bodyBuffer: Buffer) => void) => boolean) &
-			((middleware: MiddlewareCallback, callback: (bodyParsed: string, bodyBuffer: Buffer) => void, type: "text") => boolean) &
-			((middleware: MiddlewareCallback, callback: (bodyParsed: ObjectLiteral, bodyBuffer: Buffer) => void, type: "json" | "form") => boolean) &
+			((middleware: MiddlewareCallback, callback: (bodyParsed: POSTBody, bodyBuffer: Buffer) => void) => boolean) &
+			((middleware: MiddlewareCallback, callback: (bodyParsed: POSTTextBody, bodyBuffer: Buffer) => void, type: "text") => boolean) &
+			((middleware: MiddlewareCallback, callback: (bodyParsed: POSTJSONBody, bodyBuffer: Buffer) => void, type: "json") => boolean) &
+			((middleware: MiddlewareCallback, callback: (bodyParsed: ObjectLiteral, bodyBuffer: Buffer) => void, type: "json-object") => boolean) &
+			((middleware: MiddlewareCallback, callback: (bodyParsed: Array<any>, bodyBuffer: Buffer) => void, type: "json-array") => boolean) &
+			((middleware: MiddlewareCallback, callback: (bodyParsed: POSTFormBody, bodyBuffer: Buffer) => void, type: "form") => boolean) &
 			((middleware: MiddlewareCallback, callback: (bodyParsed: POSTMultipartBody) => void, type: "multipart") => boolean) &
-			((middleware: MiddlewareCallback, callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean) &
+			((middleware: MiddlewareCallback, callback: (bodyParsed: POSTRawBody, bodyBuffer: Buffer) => void, type: "raw") => boolean) &
 
-			((middleware: MiddlewareCallback[], callback: (bodyParsed: string | ObjectLiteral, bodyBuffer: Buffer) => void) => boolean) &
-			((middleware: MiddlewareCallback[], callback: (bodyParsed: string, bodyBuffer: Buffer) => void, type: "text") => boolean) &
-			((middleware: MiddlewareCallback[], callback: (bodyParsed: ObjectLiteral, bodyBuffer: Buffer) => void, type: "json" | "form") => boolean) &
+			((middleware: MiddlewareCallback[], callback: (bodyParsed: POSTBody, bodyBuffer: Buffer) => void) => boolean) &
+			((middleware: MiddlewareCallback[], callback: (bodyParsed: POSTTextBody, bodyBuffer: Buffer) => void, type: "text") => boolean) &
+			((middleware: MiddlewareCallback[], callback: (bodyParsed: POSTJSONBody, bodyBuffer: Buffer) => void, type: "json") => boolean) &
+			((middleware: MiddlewareCallback[], callback: (bodyParsed: ObjectLiteral, bodyBuffer: Buffer) => void, type: "json-object") => boolean) &
+			((middleware: MiddlewareCallback[], callback: (bodyParsed: Array<any>, bodyBuffer: Buffer) => void, type: "json-array") => boolean) &
+			((middleware: MiddlewareCallback[], callback: (bodyParsed: POSTFormBody, bodyBuffer: Buffer) => void, type: "form") => boolean) &
 			((middleware: MiddlewareCallback[], callback: (bodyParsed: POSTMultipartBody) => void, type: "multipart") => boolean) &
-			((middleware: MiddlewareCallback[], callback: (bodyParsed: Buffer, bodyBuffer: Buffer) => void, type: "raw") => boolean)
+			((middleware: MiddlewareCallback[], callback: (bodyParsed: POSTRawBody, bodyBuffer: Buffer) => void, type: "raw") => boolean)
 		} RequestHandlerPOST
 	 */
 
@@ -962,226 +1088,288 @@ class RequestEvent extends EventListener.Event {
 	 * @typedef {(callback: RequestCallbackOPTIONS) => boolean} RequestHandlerOPTIONS
 	 */
 
+
+	/**
+	 * @type {
+			((event: string, listener: (event: RequestEvent) => void) => EventListener.Listener) &
+			((event: 'beforesend', listener: (event: EventListener.Event & {responseData: any, responseStatus: number, responseHeaders: http.OutgoingHttpHeaders}) => void) => EventListener.Listener)
+		}
+	 */
+	on;
+
+	/**
+	 * Request object
+	 * @type {http.IncomingMessage}
+	 */
+	req;
+
+	/**
+	 * Response object
+	 * @type {http.ServerResponse}
+	 */
+	res;
+
+	/**
+	 * Request method
+	 * @type {string}
+	 */
+	method;
+
+	/**
+	 * Remote IP address
+	 * @type {string}
+	 */
+	remoteIp;
+
+	/**
+	 * Remote IP address
+	 * @deprecated Use `remoteIp` instead
+	 * @type {string}
+	 */
+	RemoteIP;
+
+	/**
+	 * Forwarded IP address
+	 * @type {string}
+	 */
+	proxyIp;
+
+	/**
+	 * Forwarded IP address
+	 * @deprecated Use `proxyIp` instead
+	 * @type {string}
+	 */
+	ProxyIP;
+
+	/**
+	 * IP address of the client
+	 * @type {string}
+	 */
+	ip;
+
+	/**
+	 * IP address of the client
+	 * @deprecated Use `ip` instead
+	 * @type {string}
+	 */
+	IP;
+
+	/**
+	 * Request host
+	 * @type {string}
+	 */
+	host;
+
+	/**
+	 * Request host
+	 * @deprecated Use 'host' instead
+	 * @type {string}
+	 */
+	HOST;
+
+	/**
+	 * Request protocol
+	 * @type {"http" | "https"}
+	 */
+	protocol;
+
+	/**
+	 * Request origin
+	 * @type {string}
+	 * @example "https://www.example.com"
+	 */
+	origin;
+
+	/**
+	 * Request destination path
+	 * @type {string}
+	 */
+	path;
+
+	/**
+	 * Request destination path
+	 * @deprecated Use 'path' instead
+	 * @type {string}
+	 */
+	Path;
+
+	/**
+	 * Request query string parameters object
+	 * @type {RequestQuery}
+	 */
+	query;
+
+	/**
+	 * Parsed request URL
+	 * @type {URL}
+	 */
+	url;
+
+	/**
+	 * Tells if the request comes from trusted origin
+	 * @type {boolean}
+	 */
+	isTrusted;
+
+	/**
+	 * Tells if the request comes from trusted origin
+	 * @deprecated Use 'isTrusted' instead
+	 * @type {boolean}
+	 */
+	IS_TRUSTED;
+
+	/**
+	 * Enables auto prevent when calling methods 'get', 'post', 'send', 'sendFile', 'streamFile'...
+	 * @type {boolean}
+	 */
+	autoPrevent;
+
+	/**
+	 * Array of matches, if wildcard handler was used.
+	 * Contains properties named by defined parameters in the event handler with their corresponding matched values.
+	 * @type {string[] & {[param: string]: string} & {matches: string[]}}
+	 */
+	matches;
+
+	/**
+	 * HTTP headers sent by the client
+	 * @type {http.IncomingHttpHeaders}
+	 */
+	headers;
+
+	/**
+	 * Determines if the request was redirected
+	 * @type {boolean}
+	 */
+	isRedirected;
+
+	/**
+	 * Array of redirected paths
+	 * @type {string[]}
+	 */
+	redirectChain;
+
+	/**
+	 * `true` if the request body was successfully received and parsed, otherwise `false`
+	 * @type {boolean}
+	 */
+	isBodyReceived = false;
+
+	/**
+	 * Received body raw buffer
+	 * @type {Buffer | null}
+	 */
+	bodyRaw = null;
+
+	/**
+	 * Parsed body data
+	 * `undefined` if the body was not received yet or could not be parsed
+	 * @type {POSTBody | undefined}
+	 */
+	body = undefined;
+
+	/**
+	 * Represents custom data object. Could be used in the middlewares to transfer data into event handlers.
+	 * @type {ObjectLiteral}
+	 */
+	data = {};
+
+	/**
+	 * Error thrown by any of the request handlers
+	 * @type {(ObjectLiteral & Error) | null}
+	 */
+	error = null;
+
+	/**
+	 * Resolved path to requested file or directory in local file system. Can contain `null` value, in case the resource cannot be resolved.
+	 * @type {string | null}
+	 */
+	resolvedPath;
+
+	/**
+	 * Resolved path to requested file in local file system
+	 * @deprecated Use 'resolvedResource' instead
+	 * @type {string | null}
+	 */
+	resolvedFile;
+
+	/**
+	 * Formidable options
+	 * @type {formidable.Options}
+	 */
+	formidableOptions = {
+		maxFileSize: 200 * 1024 * 1024
+	};
+
+	/**
+	 * Received POST body type determined by the content-type header
+	 * @type {POSTBodyType | null}
+	 */
+	receivedPostType = null;
+
+	/**
+	 * Expected POST body type determined by the request handler
+	 * @type {POSTBodyType | null}
+	 */
+	expectedPostType = null;
+
+	/**
+	 * Resolved POST body type determined by the request handler
+	 * @type {POSTBodyType}
+	 */
+	resolvedPostType = "raw";
+
+	/**
+	 * Handles GET requests
+	 * @returns {boolean} True if request was successfully handled, otherwise false
+	 * @type {RequestHandlerGET}
+	*/
+	get = this.__get;
+
+	/**
+	 * Handles POST requests
+	 * @returns {boolean} True if request was successfully handled, otherwise false
+	 * @type {RequestHandlerPOST}
+	*/
+	post = this.__post;
+
+	/**
+	 * Handles OPTIONS requests
+	 * @returns {boolean} True if request was successfully handled, otherwise false
+	 * @type {RequestHandlerOPTIONS}
+	*/
+	options = this.__options;
+
+
+	/**
+	 * Creates an instance of RequestEvent.
+	 * @param {*} data
+	 * @memberof RequestEvent
+	 */
 	constructor(data) {
 		super(data);
 
 		//To make RequestEvent extend both EventListener.Event and EventListener
 		const listener = new EventListener();
 		Object.assign(this, listener);
+		// @ts-ignore
 		Object.defineProperties(this.__proto__, Object.getOwnPropertyDescriptors(listener.__proto__));
+
+		// Copy the data here to prevent property shadowing
+		for(const key in data) {
+			this[key] = data[key];
+		}
 
 		//Properties to modify event distribution
 		this.async = true;
 		this.parallel = true;
-
-		/**
-		 * @type {
-				((event: string, listener: (event: RequestEvent) => void) => EventListener.Listener) &
-				((event: 'beforesend', listener: (event: EventListener.Event & {responseData: any, responseStatus: number, responseHeaders: http.OutgoingHttpHeaders}) => void) => EventListener.Listener)
-			}
-		 */
-		this.on;
-
-		/**
-		 * @type {http.IncomingMessage} Request object
-		 */
-		this.req;
-
-		/**
-		 * @type {http.ServerResponse} Response object
-		 */
-		this.res;
-
-		/**
-		 * @type {string} Request method
-		 */
-		this.method;
-
-		/**
-		 * @type {string} Remote IP address
-		 */
-		this.remoteIp;
-
-		/**
-		 * @deprecated Use `remoteIp` instead
-		 * @type {string} Remote IP address
-		 */
-		this.RemoteIP;
-
-		/**
-		 * @type {string} Forwarded IP address
-		 */
-		this.proxyIp;
-
-		/**
-		 * @deprecated Use `proxyIp` instead
-		 * @type {string} Forwarded IP address
-		 */
-		this.ProxyIP;
-
-		/**
-		 * @type {string} IP address of the client
-		 */
-		this.ip;
-
-		/**
-		 * @deprecated Use `ip` instead
-		 * @type {string} IP address of the client
-		 */
-		this.IP;
-
-		/**
-		 * @type {string} Request host
-		 */
-		this.host;
-
-		/**
-		 * @deprecated Use 'host' instead
-		 * @type {string} Request host
-		 */
-		this.HOST;
-
-		/**
-		 * @type {string} Request protocol
-		 * @example "http" or "https"
-		 */
-		this.protocol;
-
-		/**
-		 * @type {string} Request origin
-		 * @example "https://www.example.com"
-		 */
-		this.origin;
-
-		/**
-		 * @type {string} Request destination path
-		 */
-		this.path;
-
-		/**
-		 * @deprecated Use 'path' instead
-		 * @type {string} Request destination path
-		 */
-		this.Path;
-
-		/**
-		 * @type {RequestQuery} Request query string parameters object
-		 */
-		this.query;
-
-		/**
-		 * @type {URL} Parsed request URL
-		 */
-		this.url;
-
-		/**
-		 * @type {boolean} Tells if the request comes from trusted origin
-		 */
-		this.isTrusted;
-
-		/**
-		 * @deprecated Use 'isTrusted' instead
-		 * @type {boolean} Tells if the request comes from trusted origin
-		 */
-		this.IS_TRUSTED;
-
-		/**
-		 * @type {boolean} Enables auto prevent when calling methods 'get', 'post', 'send', 'sendFile', 'streamFile'...
-		 */
-		this.autoPrevent;
-
-		/**
-		 * @type {string[] & {[param: string]: string} & {matches: string[]}} Array of matches, if wildcard handler was used.
-		 * Contains properties named by defined parameters in the event handler with their corresponding matched values.
-		 */
-		this.matches;
-
-		/**
-		 * @type {http.IncomingHttpHeaders} HTTP headers sent by the client
-		 */
-		this.headers;
-
-		/**
-		 * @type {boolean} Determines if the request was redirected
-		 */
-		this.isRedirected;
-
-		/**
-		 * @type {string[]} Array of redirected paths
-		 */
-		this.redirectChain;
-
-		/**
-		 * @type {boolean} `true` if the request body was successfully received and parsed
-		 */
-		this.isBodyReceived = false;
-
-		/**
-		 * @type {Buffer} Received body raw buffer
-		 */
-		this.bodyRaw = undefined;
-
-		/**
-		 * @type {any} Parsed body data
-		 */
-		this.body = undefined;
-
-		/**
-		 * @type {ObjectLiteral} Represents custom data object. Could be used in the middlewares to transfer data into event handlers.
-		 */
-		this.data = {};
-
-		/**
-		 * @type {(ObjectLiteral & Error)?} Error thrown by any of the request handlers
-		 */
-		this.error = null;
-
-		/**
-		 * @type {string?} Resolved path to requested file or directory in local file system. Can contain `null` value, in case the resource cannot be resolved.
-		 */
-		this.resolvedPath;
-
-		/**
-		 * @deprecated Use 'resolvedResource' instead
-		 * @type {string?} Resolved path to requested file in local file system
-		 */
-		this.resolvedFile;
-
-		/**
-		 * @type {formidable.Options} Formidable options
-		 */
-		this.formidableOptions = {
-			maxFileSize: 200 * 1024 * 1024
-		};
-
-
-		/**
-		 * Handles GET requests
-		 * @returns {boolean} True if request was successfully handled, otherwise false
-		 * @type {RequestHandlerGET}
-		*/
-		this.get = this.__get;
-
-		/**
-		 * Handles POST requests
-		 * @returns {boolean} True if request was successfully handled, otherwise false
-		 * @type {RequestHandlerPOST}
-		*/
-		this.post = this.__post;
-
-		/**
-		 * Handles OPTIONS requests
-		 * @returns {boolean} True if request was successfully handled, otherwise false
-		 * @type {RequestHandlerOPTIONS}
-		*/
-		this.options = this.__options;
 	}
 
 	// eslint-disable-next-line valid-jsdoc
 	/**
 	 * @private
 	 */
-	__get(middlewares, callback = null) {
+	__get(middlewares, callback) {
 		//Middlewares
 		if(!callback && typeof middlewares === "function") { // f(callback)
 			callback = middlewares;
@@ -1243,16 +1431,16 @@ class RequestEvent extends EventListener.Event {
 		};
 
 		//Type checking
-		if(!type) {
-			const contentType = this.headers["content-type"] || "";
+		const contentType = this.headers["content-type"] || "";
 
-			if(contentType.indexOf("application/json") != -1) type = "json";
-			else if(contentType.indexOf("application/x-www-form-urlencoded") != -1) type = "form";
-			else if(contentType.indexOf("multipart/form-data") != -1) type = "multipart";
-			else if(contentType.indexOf("text") != -1) type = "text";
-			else type = "raw";
-		}
-		this.__postType = type;
+		if(contentType.indexOf("application/json") != -1) this.receivedPostType = "json";
+		else if(contentType.indexOf("application/x-www-form-urlencoded") != -1) this.receivedPostType = "form";
+		else if(contentType.indexOf("multipart/form-data") != -1) this.receivedPostType = "multipart";
+		else if(contentType.indexOf("text") != -1) this.receivedPostType = "text";
+		else this.receivedPostType = "raw";
+
+		this.expectedPostType = type || null;
+		this.resolvedPostType = this.expectedPostType || this.receivedPostType;
 
 		middlewares.push(Server.POST_BODY_HANDLER);
 
@@ -1340,55 +1528,60 @@ class RequestEvent extends EventListener.Event {
 		const forceLogin = callback !== false;
 		const hasCallback = forceLogin && callback !== null;
 
+		const shouldUseToken = "token" in credentials;
+		const shouldUseCreds = "username" in credentials && "password" in credentials;
+
 		//Handle callback type
 		if(hasCallback && typeof callback !== "function") throw new TypeError(`Callback '${callback}' is not type of function or null`);
 
 		//No auth header
 		if(!auth && (!basic || !bearer)) {
-			if(forceLogin) this.send("", 401, "text/html", {"www-authenticate": `Basic realm="${realm}"`});
+			if(forceLogin) this.send("", 401, "text/html", {
+				"www-authenticate": shouldUseToken ? `Bearer realm="${realm}"` : `Basic realm="${realm}"`
+			});
 			return false;
 		}
 
 		//Bearer auth
-		if(typeof credentials.token !== "undefined") {
+		if(shouldUseToken) {
 			//Check access
-			if(bearer == credentials.token) {
-				Server.log(`§eToken '${bearer}' just used!`);
-				if(hasCallback) callback(credentials);
-				return true;
-			} else {
+			if(bearer !== credentials.token) {
+				if(forceLogin) this.send("401 Unauthorized: Invalid token", 401);
 				Server.log(`§eInvalid token attempt '${bearer}'!`);
-				if(forceLogin) this.send("401 Unauthorized", 401);
 				return false;
 			}
+
+			Server.log(`§eToken '${bearer}' just used!`);
+			if(hasCallback) callback(credentials);
+			return true;
 		}
 
 		//Basic auth
-		if(typeof credentials.username !== "undefined" && typeof credentials.password !== "undefined") {
+		if(shouldUseCreds) {
 			//Decode credentials
 			try {
 				var [username, password] = atob(basic).split(":");
-			} catch(e) {
-				Server.error(e);
+			} catch(err) {
+				Server.error("Failed to parse authorization header:", basic, err);
 
-				this.send("500 Error occurred while decoding credentials", 401);
+				this.send("400 Bad Request: Authorization header malformed", 400);
 				return false;
 			}
 
 			//Check access
-			if(username == credentials.username && password == credentials.password) {
-				Server.log(`§eUser '${username}' just logged in!`);
-				if(hasCallback) callback(credentials);
-				return true;
-			} else {
+			if(username !== credentials.username || password !== credentials.password) {
+				if(forceLogin) this.send("401 Unauthorized: Invalid credentials", 401);
 				Server.log(`§eUnsuccessful login attempt '${username}:${password}'!`);
-				if(forceLogin) this.send("401 Unauthorized", 401);
 				return false;
 			}
+
+			Server.log(`§eUser '${username}' just logged in!`);
+			if(hasCallback) callback(credentials);
+			return true;
 		}
 
 		//Unsupported auth
-		this.send("500 Cannot process provided authentication type", 500);
+		this.send("500 Internal Server Error: Cannot process provided authentication type", 500);
 		throw new TypeError("Invalid credentials / unsupported authentication type" + JSON.stringify({credentials, auth}));
 	}
 
@@ -1402,38 +1595,42 @@ class RequestEvent extends EventListener.Event {
 	send(data, status = 200, contentType = "text/plain", headers = {}) {
 		this.preventDefault();
 
-		if(!this.res.writableEnded) {
-			//Send data
-			const isObject = typeof data === "object";
-			const isBuffer = data instanceof Buffer;
-			const isStream = !!data.pipe;
-
-			const computedContentType = ((isBuffer || isStream) ? contentType : (isObject ? "application/json" : contentType)) || "text/plain";
-
-			const responseHeaders = {
-				"Content-Type": `${computedContentType}; charset=utf-8`,
-				...headers
-			};
-
-			this.dispatchEvent("beforesend", {
-				responseData: data,
-				responseStatus: status,
-				responseHeaders: responseHeaders
-			}, event => {
-				this.res.writeHead(event.responseStatus, event.responseHeaders);
-
-				if(isStream) {
-					event.responseData.pipe(this.res);
-				} else {
-					this.res.write(isBuffer ? event.responseData : (isObject ? JSON.stringify(event.responseData) : event.responseData + ""));
-					this.res.end();
-				}
-
-				Server._connectionLog(event.responseStatus);
-			});
-		} else {
+		// Response already sent
+		if(this.res.writableEnded) {
 			this._logWriteAfterEndWarning(new Error());
+			return;
 		}
+
+		//Send data
+		const isObject = typeof data === "object";
+		const isBuffer = data instanceof Buffer;
+		// @ts-ignore
+		const isStream = !!data.pipe;
+
+		const computedContentType = ((isBuffer || isStream) ? contentType : (isObject ? "application/json" : contentType)) || "text/plain";
+
+		const responseHeaders = {
+			"Content-Type": `${computedContentType}; charset=utf-8`,
+			...headers
+		};
+
+		// @ts-ignore
+		this.dispatchEvent("beforesend", {
+			responseData: data,
+			responseStatus: status,
+			responseHeaders: responseHeaders
+		}, event => {
+			this.res.writeHead(event.responseStatus, event.responseHeaders);
+
+			if(isStream) {
+				event.responseData.pipe(this.res);
+			} else {
+				this.res.write(isBuffer ? event.responseData : (isObject ? JSON.stringify(event.responseData) : event.responseData + ""));
+				this.res.end();
+			}
+
+			Server._connectionLog(event.responseStatus);
+		});
 	}
 
 	/**
@@ -1562,7 +1759,7 @@ class RequestEvent extends EventListener.Event {
 	/**
 	 *
 	 * @private
-	 * @param {Error} error
+	 * @param {Error} error Error object need to be passed from the faulty place to keep the stack trace clean
 	 * @memberof RequestEvent
 	 */
 	_logWriteAfterEndWarning(error) {
@@ -1573,120 +1770,174 @@ class RequestEvent extends EventListener.Event {
 }
 
 
+/**
+ * @typedef {Object} CookieProperties
+ * @prop {string} [Domain] Host to which the cookie will be sent.
+ * @prop {string} [Expires] The maximum lifetime of the cookie as an HTTP-date timestamp.
+ * @prop {string} [Max-Age] Number of seconds until the cookie expires. A zero or negative number will expire the cookie immediately.
+ * @prop {string} [Path] A path that must exist in the requested URL, or the browser won't send the `Cookie` header.
+ * @prop {"Strict" | "Lax" | "None"} [SameSite] Controls whether a cookie is sent with cross-origin requests, providing some protection against cross-site request forgery attacks (CSRF).
+ * @prop {boolean} [HttpOnly] The cookie cannot be read by client-side JavaScript. This restriction eliminates the threat of cookie theft via cross-site scripting (XSS).
+ * @prop {boolean} [Partitioned] Indicates that the cookie should be stored using partitioned storage.
+ * @prop {boolean} [Secure] A secure cookie is only sent to the server when a request is made with the https: scheme.
+ */
 class CookieJar {
-	constructor() {
-		/**
-		 * @type {CookieJar.Cookie[]}
-		 */
-		this.cookies = [];
+	/** @type {
+		((cookie: string, value: string, options?: ObjectLiteral) => this) &
+		((cookie: string[]) => this) &
+		((cookie: CookieJar.Cookie) => this) &
+		((cookie: CookieJar.Cookie[]) => this) &
+		((cookie: http.IncomingMessage) => this) &
+		((cookie: http.ServerResponse) => this)
+	} */
+	setCookie;
 
-		if(arguments.length) this.setCookie.apply(this, arguments);
-	}
+	/** @type {CookieJar.Cookie[]} */
+	cookies;
 
 	/**
-	 * Adds cookie to the Jar
-	 * @param {string | CookieJar.Cookie | http.IncomingMessage} cookie Cookie name (requires second parameter), Cookie String, CookieJar.Cookie object, ServerResponseLike object
-	 * @param {string} [value=undefined]
-	 * @param {ObjectLiteral} [options={}]
-	 * @returns {CookieJar}
+	 * Creates an instance of CookieJar.
+	 * @param {any[]} args
 	 * @memberof CookieJar
 	 */
-	setCookie(cookie, value = undefined, options = {}) {
-		//Set by name=value
-		if(typeof value !== "undefined") {
-			const _cookie = new CookieJar.Cookie();
-			_cookie.name = cookie.trim();
-			_cookie.value = (value ?? "").trim();
+	constructor(...args) {
+		this.cookies = [];
 
-			for(const [i, key, value] of iterate(options)) {
-				if(value == true) _cookie.flags.push(key);
-				else if(value == false) _cookie.flags.splice(_cookie.flags.indexOf(key), 1);
-				else if(value !== undefined) _cookie.props[CookieJar.Cookie.formatKeyword(key) || key] = value;
+		this.setCookie = (...args) => {
+			//Set by name=value
+			{
+				const [name, value, options = {}] = /**@type {[string, string, CookieProperties]}*/(args);
+
+				if(typeof value === "string") {
+					if(!name) return Server.warn("Cannot set cookie: Cookie name is empty"), this;
+
+					const cookie = new CookieJar.Cookie(name.trim(), value.trim(), options);
+
+					this._addCookiesToJar(cookie);
+					return this;
+				}
 			}
 
-			this._addCookiesToJar(_cookie);
-			return this;
-		}
+			//Set by array of cookie strings
+			{
+				const [cookieStrings] = /**@type {[string[]]}*/(args);
 
-		//Set by Cookie object
-		if(cookie instanceof CookieJar.Cookie) {
-			this._addCookiesToJar(cookie);
-			return this;
-		}
+				if(Array.isArray(cookieStrings) && typeof cookieStrings[0] === "string") {
+					const cookies = CookieJar.Cookie.parse(cookieStrings);
 
-		if(typeof cookie == "object") {
-			const cookieString = cookie?.headers?.cookie;
-			const header = cookie?.headers?.raw?.()?.["set-cookie"];
-			const jsonObject = Object.keys(cookie).includes("cookies") ? cookie.cookies : null;
+					this._addCookiesToJar(...cookies);
+					return this;
+				}
+			}
+
+			//Set by Cookie object
+			{
+				const [cookie] = /**@type {[CookieJar.Cookie]}*/(args);
+
+				if(cookie instanceof CookieJar.Cookie) {
+					this._addCookiesToJar(cookie);
+					return this;
+				}
+			}
+
+			//Set by Cookie array
+			{
+				const [cookies] = /**@type {[CookieJar.Cookie[]]}*/(args);
+
+				if(Array.isArray(cookies) && cookies[0] instanceof CookieJar.Cookie) {
+					this._addCookiesToJar(...cookies);
+					return this;
+				}
+			}
 
 			//Set by Request object
-			if(cookieString) {
-				const cookieStringArray = cookieString.split(";");
-				const cookies = CookieJar.Cookie.parse(cookieStringArray);
-				this._addCookiesToJar(...cookies);
+			{
+				const [request] = /**@type {[http.IncomingMessage]}*/(args);
+
+				if(request instanceof http.IncomingMessage) {
+					const cookieString = request.headers.cookie;
+					if(!cookieString) return this;
+
+					const cookies = CookieJar.Cookie.parse(cookieString.split(";"));
+
+					this._addCookiesToJar(...cookies);
+					return this;
+				}
 			}
 
 			//Set by Response object
-			if(header) {
-				const cookies = CookieJar.Cookie.parse(header);
-				this._addCookiesToJar(...cookies);
+			{
+				const [response] = /**@type {[http.ServerResponse]}*/(args);
+
+				if(response instanceof http.ServerResponse) {
+					const cookieString = response.getHeader("set-cookie");
+					if(!cookieString) return this;
+
+					const cookieArray = Array.isArray(cookieString) ? cookieString : [`${cookieString}`];
+					const cookies = CookieJar.Cookie.parse(cookieArray);
+
+					this._addCookiesToJar(...cookies);
+					return this;
+				}
 			}
 
 			//Set by JSON object
-			if(jsonObject) {
-				for(const cookieObject of jsonObject) {
-					const _cookie = new CookieJar.Cookie();
-					_cookie.name = cookieObject.name;
-					_cookie.value = cookieObject.value;
-					_cookie.props = cookieObject.props;
-					_cookie.flags = cookieObject.flags;
-					this._addCookiesToJar(_cookie);
+			{
+				const [jsonObject] = /**@type {[CookieJar]}*/(args);
+
+				if(typeof jsonObject === "object" && jsonObject !== null && "cookies" in jsonObject) {
+					for(const cookieObject of jsonObject.cookies) {
+						const cookie = new CookieJar.Cookie(cookieObject.name, cookieObject.value, cookieObject.props);
+						this._addCookiesToJar(cookie);
+					}
+					return this;
 				}
 			}
-			return this;
-		}
 
-		//TODO: Set by cookie string
+			throw new TypeError(`Cannot set cookie: ${args[0]}, ${args[1]}, ${args[2]}`);
+		};
 
-		throw new TypeError("Cannot set cookie: " + cookie);
+		// Parse input arguments
+		if(arguments.length) this.setCookie.apply(this, arguments);
 	}
 
 	/**
 	 * Returns cookie object found by name
 	 * @param {string} name Cookie name
 	 * @param {boolean} [expired=true] Include expired cookies
-	 * @returns {CookieJar.Cookie} Cookie object if found, otherwise undefined
+	 * @returns {CookieJar.Cookie | null} Cookie object if found, otherwise undefined
 	 * @memberof CookieJar
 	 */
 	getCookie(name, expired = true) {
 		const cookies = this.getCookies(expired);
-		return cookies.find(cookie => cookie.name == name);
+		return cookies.find(cookie => cookie.name == name) || null;
 	}
 
 	/**
 	 * Removes cookie from the Jar
 	 * @param {string | CookieJar.Cookie} cookie
-	 * @returns {CookieJar.Cookie} Deleted cookie
+	 * @returns {CookieJar.Cookie | null} Deleted cookie
 	 * @memberof CookieJar
 	 */
 	deleteCookie(cookie) {
-		let _cookie = null;
-		if(typeof cookie === "string") _cookie = this.getCookie(cookie);
-		else if(cookie instanceof CookieJar.Cookie) _cookie = cookie;
-		else throw new TypeError("Invalid cookie: " + cookie);
+		// Obtain the index of the cookie
+		let index = -1;
+		if(typeof cookie === "string") index = this.cookies.findIndex(e => e.name === cookie);
+		else if(cookie instanceof CookieJar.Cookie) index = this.cookies.indexOf(cookie);
 
-		const id = this.cookies.indexOf(_cookie);
-		if(id < 0 || !_cookie) return null;
-		else this.cookies.splice(id, 1);
-		return _cookie;
+		// Validate the index
+		if(index === -1) return null;
+
+		// Remove the cookie
+		return this.cookies.splice(index, 1)[0] || null;
 	}
 
 	/**
 	 * Sends header with cookies
 	 * @param {http.ServerResponse} response Server response object
-	 * @param {boolean} [full=true] Include cookie properties and flags
+	 * @param {boolean} [full=true] Include cookie properties
 	 * @param {boolean} [expired=full] Include expired cookies
-	 * @returns {CookieJar}
+	 * @returns {this}
 	 * @memberof CookieJar
 	 */
 	sendCookies(response, full = true, expired = full) {
@@ -1697,7 +1948,7 @@ class CookieJar {
 
 	/**
 	 * Converts Cookie object to cookie string
-	 * @param {boolean} [full=true] Include cookie properties and flags
+	 * @param {boolean} [full=true] Include cookie properties
 	 * @param {boolean} [expired=full] Include expired cookies
 	 * @returns {string} Cookie String
 	 * @memberof CookieJar
@@ -1715,7 +1966,7 @@ class CookieJar {
 	 */
 	isEmpty(expired = true) {
 		const cookies = this.getCookies(expired);
-		return cookies.length == 0;
+		return cookies.length === 0;
 	}
 
 	/**
@@ -1765,6 +2016,7 @@ class CookieJar {
 	 */
 	_addCookiesToJar(...cookies) {
 		for(const cookie of cookies) {
+			if(!(cookie instanceof CookieJar.Cookie)) continue;
 			this.deleteCookie(cookie.name);
 			this.cookies.push(cookie);
 		}
@@ -1776,27 +2028,17 @@ class CookieJar {
  */
 CookieJar.Cookie = class Cookie {
 	/**
-	 * @typedef {Object} CookieProperties
-	 * @prop {string} [Expires] The maximum lifetime of the cookie as an HTTP-date timestamp.
-	 * @prop {string} [Max-Age] Number of seconds until the cookie expires. A zero or negative number will expire the cookie immediately.
-	 * @prop {string} [Domain] Host to which the cookie will be sent.
-	 * @prop {string} [Path] A path that must exist in the requested URL, or the browser won't send the `Cookie` header.
-	 * @prop {string} [SameSite] Controls whether a cookie is sent with cross-origin requests, providing some protection against cross-site request forgery attacks (CSRF).
+	 * Creates an instance of Cookie.
+	 * @param {string} name
+	 * @param {string | number | boolean} value
+	 * @param {CookieProperties} [properties={}]
 	 */
+	constructor(name, value, properties = {}) {
+		this.name = name.trim();
+		this.value = `${value}`.trim();
 
-	constructor() {
-		this.name = "";
-		this.value = "";
-
-		/**
-		 * @type {CookieProperties}
-		 */
-		this.props = {};
-
-		/**
-		 * @type {Array<"Secure" | "HttpOnly">}
-		 */
-		this.flags = [];
+		/** @type {CookieProperties} */
+		this.props = properties || {};
 	}
 
 	/**
@@ -1805,28 +2047,46 @@ CookieJar.Cookie = class Cookie {
 	 * @returns {string} Cookie String
 	 */
 	toString(full = true) {
-		const head = `${this.name}=${this.value}; `;
-		const props = Object.reduce(this.props, (prev, [key, val]) => prev + `${key}=${val}; `, "");
-		const flags = this.flags.join("; ");
+		const props = [`${this.name}=${this.value}`];
 
-		return full ? `${head}${props}${flags ? `${flags}; ` : ""}` : head;
-	}
-
-	isExpired() {
-		return this.props["Expires"] && new Date(this.props["Expires"]) < new Date();
-	}
-
-	static keywords = ["Expires", "Max-Age", "Domain", "Path", "Secure", "HttpOnly", "SameSite"];
-	static formatKeyword(key) {
-		for(const keyword of this.keywords) {
-			if(keyword.toLowerCase() == key.toLowerCase()) return keyword;
+		for(const [i, key, value] of iterate(this.props)) {
+			if(!value) continue;
+			props.push(typeof value === "string" ? `${key}=${value}` : key);
 		}
-		return false;
+
+		return `${full ? props.join("; ") : props[0]}; `;
 	}
 
+	/**
+	 * Checks if the cookie is expired
+	 * @return {boolean} 
+	 */
+	isExpired() {
+		const expires = this.props["Expires"];
+		if(!expires) return false;
+
+		return new Date(expires).getTime() < Date.now();
+	}
+
+	// eslint-disable-next-line valid-jsdoc
+	/**
+	 * @static
+	 * @param {string} key
+	 * @return {(keyof CookieProperties) | false} 
+	 */
+	static formatKeyword(key) {
+		return /**@type {(keyof CookieProperties)[]}*/(["Expires", "Max-Age", "Domain", "Path", "Secure", "HttpOnly", "Partitioned", "SameSite"])
+			.find(keyword => keyword.toLowerCase() == key.toLowerCase()) || false;
+	}
+
+	/**
+	 * @static
+	 * @param {string[]} cookieStringArray
+	 * @return {CookieJar.Cookie[]} 
+	 */
 	static parse(cookieStringArray) {
 		return cookieStringArray.map(cookieString => {
-			const cookie = new CookieJar.Cookie();
+			const cookie = new CookieJar.Cookie("", "");
 			const properties = cookieString.split(/;\s*/);
 
 			for(const property of properties) {
@@ -1842,10 +2102,10 @@ CookieJar.Cookie = class Cookie {
 						cookie.props[this.formatKeyword(key) || key] = value;
 					}
 				} else if(flag) {
-					cookie.flags.push(flag);
+					cookie.props[this.formatKeyword(flag) || flag] = true;
 				} else {
 					//throw new TypeError("Failed to parse cookie: '" + property + "'");
-					Server.warn("Failed to parse cookie: '" + property + "'");
+					Server.warn(`Failed to parse cookie: '${property}'`);
 				}
 			}
 
@@ -2021,7 +2281,7 @@ Server.on("/request", e => {
 	});
 });`;
 
-const CONTENT_TYPES = {
+const CONTENT_TYPES = /**@type {const}*/({
 	"aac": "audio/aac",
 	"avi": "video/x-msvideo",
 	"bin": "application/octet-stream",
@@ -2083,7 +2343,7 @@ const CONTENT_TYPES = {
 	"xml": "application/xml",
 	"zip": "application/zip",
 	"7z": "application/x-7z-compressed"
-};
+});
 Server.CONTENT_TYPES = CONTENT_TYPES;
 
 const STATUS = {
@@ -2166,129 +2426,147 @@ Server.STATUS = STATUS;
 // eslint-disable-next-line valid-jsdoc
 /** @type {MiddlewareCallback} */
 Server.POST_BODY_HANDLER = function(event, next) {
-	if(event.method === "POST") {
-		if(event.autoPrevent) event.defaultPrevented = true;
+	// Ignore if method is not POST
+	if(event.method !== "POST") return;
 
-		//Skip body handling if it's already handled
-		if(event.isBodyReceived) {
-			next();
+	if(event.autoPrevent) event.defaultPrevented = true;
+
+	//Skip body handling if it's already handled
+	if(event.isBodyReceived) {
+		next();
+		return;
+	}
+
+	const type = event.resolvedPostType;
+
+	if(type === "multipart") {
+		const contentLength = parseInt(event.req.headers["content-length"] || "");
+		if(isNaN(contentLength)) return event.send("411 Length Required", Server.STATUS.CLIENT.LENGTH_REQUIRED);
+
+		if(event.formidableOptions.maxFileSize && contentLength > event.formidableOptions.maxFileSize) {
+			event.send("413 Payload Too Large", Server.STATUS.CLIENT.PAYLOAD_TOO_LARGE);
 			return;
 		}
 
-		const type = event.__postType;
+		const form = new formidable.IncomingForm(event.formidableOptions);
+		const body = {};
 
-		if(type == "multipart") {
-			if(+event.headers["content-length"] > event.formidableOptions.maxFileSize) {
-				event.send("413 Payload Too Large", Server.STATUS.CLIENT.PAYLOAD_TOO_LARGE);
-				return;
+		//Handle multipart/form-data request body
+		form.parse(event.req, err => {
+			if(err) throw err;
+
+			//Create single value properties
+			for(const key in body) {
+				if(!body.hasOwnProperty(key)) continue;
+
+				const field = body[key];
+				field.value = field.array[field.array.length - 1];
 			}
 
-			const form = new formidable.IncomingForm(event.formidableOptions);
-			const body = {};
+			//Set internal properties
+			event.body = body;
+			event.bodyRaw = null;
+			event.isBodyReceived = true;
 
-			//Handle multipart/form-data request body
-			form.parse(event.req, err => {
-				if(err) throw err;
+			next();
+		});
 
-				//Create single value properties
-				for(const key in body) {
-					if(!body.hasOwnProperty(key)) continue;
+		form.on("error", err => {
+			Server.error("Failed to handle multipart request:", err);
+			event.send("500 Internal Server Error", 500);
+		});
 
-					const field = body[key];
-					field.value = field.array[field.array.length - 1];
+		//Handle multiple files
+		form.on("file", (field, file) => {
+			if(!body[field]) body[field] = {
+				array: [],
+				files: [],
+				values: [],
+				value: null
+			};
+			body[field].array.push(file);
+			body[field].files.push(file);
+		});
+
+		//Handle multiple fields
+		form.on("field", (field, value) => {
+			if(!body[value]) body[field] = {
+				array: [],
+				files: [],
+				values: [],
+				value: null
+			};
+			body[field].array.push(value);
+			body[field].values.push(value);
+		});
+	} else {
+		const chunks = [];
+
+		event.req.on("data", chunk => {
+			chunks.push(chunk);
+		});
+
+		event.req.on("end", () => {
+			const buffer = Buffer.concat(chunks);
+			let body = undefined;
+
+			if(type.startsWith("json")) {
+				try {
+					body = JSON.parse(buffer.toString());
+
+					// Parse as an Object
+					if(
+						type === "json-object" &&
+						(typeof body !== "object" || body === null || Array.isArray(body))
+					) body = {};
+
+					// Parse as an Array
+					else if(
+						type === "json-array" &&
+						!Array.isArray(body)
+					) body = [];
+				} catch(err) {
+					body = undefined;
 				}
+			} else if(type === "form") {
+				body = Object.fromEntries(new URLSearchParams(buffer.toString()));
+			} else if(type === "text") {
+				body = buffer.toString();
+			} else if(type === "raw") {
+				body = buffer;
+			} else {
+				throw new TypeError(`'${type}' is invalid content type`);
+			}
 
-				//Set internal properties
-				event.body = body;
-				event.bodyRaw = undefined;
-				event.isBodyReceived = true;
+			event.body = body;
+			event.bodyRaw = buffer;
+			event.isBodyReceived = true;
 
-				next();
-			});
-
-			form.on("error", err => {
-				Server.error("Failed to handle multipart request:", err);
-				event.send("500 Internal Server Error", 500);
-			});
-
-			//Handle multiple files
-			form.on("file", (field, file) => {
-				if(!body[field]) body[field] = {
-					array: [],
-					files: [],
-					values: [],
-					value: null
-				};
-				body[field].array.push(file);
-				body[field].files.push(file);
-			});
-
-			//Handle multiple fields
-			form.on("field", (field, value) => {
-				if(!body[value]) body[field] = {
-					array: [],
-					files: [],
-					values: [],
-					value: null
-				};
-				body[field].array.push(value);
-				body[field].values.push(value);
-			});
-		} else {
-			const chunks = [];
-
-			event.req.on("data", chunk => {
-				chunks.push(chunk);
-			});
-
-			event.req.on("end", () => {
-				const buffer = Buffer.concat(chunks);
-				let body = undefined;
-
-				if(type == "json") {
-					try {
-						body = JSON.parse(buffer.toString());
-					} catch(e) {
-						body = null;
-					}
-				} else if(type == "form") {
-					body = getQueryParameters(buffer.toString());
-				} else if(type == "text") {
-					body = buffer.toString();
-				} else if(type == "raw") {
-					body = buffer;
-				} else {
-					throw new TypeError(`'${type}' is invalid content type`);
-				}
-
-				event.body = body;
-				event.bodyRaw = buffer;
-				event.isBodyReceived = true;
-
-				next();
-			});
-		}
+			next();
+		});
 	}
 };
 
 
 /* Helper Functions */
-function readFileAsync(path, ...options) {
-	return new Promise((resolve, reject) => {
-		fs.readFile(path, ...options, function(error, data) {
-			if(error) reject(error);
-			else resolve(data);
-		});
-	});
+/**
+ * Asynchronously reads a file
+ * @deprecated Use `fs.promises.readFile` instead
+ * @param {any[]} args
+ * @return {any} 
+ */
+function readFileAsync(...args) {
+	return fs.promises.readFile.apply(fs.promises, arguments);
 }
 
-function writeFileAsync(path, data, ...options) {
-	return new Promise((resolve, reject) => {
-		fs.writeFile(path, data, ...options, function(error) {
-			if(error) reject(error);
-			else resolve();
-		});
-	});
+/**
+ * Asynchronously writes a data to a file
+ * @deprecated Use `fs.promises.writeFile` instead
+ * @param {any[]} args
+ * @return {any} 
+ */
+function writeFileAsync(...args) {
+	return fs.promises.writeFile.apply(fs.promises, arguments);
 }
 
 /**
@@ -2316,35 +2594,89 @@ function Send(res, data, status = 200, type = "text/plain", headers = {}) {
 	}
 }
 
+// eslint-disable-next-line valid-jsdoc
+/**
+ * @deprecated
+ * @param {string} path
+ * @param {((json: ObjectLiteral) => ObjectLiteral) | null} [callback=null]
+ * @return {Promise<ObjectLiteral>} 
+ */
 async function editJSON(path, callback = null) {
-	var json = JSON.parse(await readFileAsync(path));
+	const json = JSON.parse(await readFileAsync(path));
+
 	if(typeof callback === "function") {
-		var newJson = callback(json);
+		const newJson = callback(json);
 		await writeFileAsync(path, JSON.stringify(newJson));
 		return newJson;
-	} else return json;
+	}
+
+	return json;
 }
 
+
+// eslint-disable-next-line valid-jsdoc
+/**
+ * Resolves content type from filename
+ * @example getContentType("index.html") // "text/html"
+ * @example getContentType("file.idk") // "text/plain"
+ * @example getContentType("file.idk", "text/x-unexpected") // "text/x-unexpected"
+ * @param {string} filename
+ * @param {(typeof CONTENT_TYPES)[keyof typeof CONTENT_TYPES] | string} [mismatch="text/plain"]
+ * @return {(typeof CONTENT_TYPES)[keyof typeof CONTENT_TYPES] | string} 
+ */
 function getContentType(filename, mismatch = "text/plain") {
 	return CONTENT_TYPES[filename.match(/\.(\w+)$/mi)?.[1]] || mismatch;
 }
 
+// eslint-disable-next-line valid-jsdoc
+/**
+ * Resolves file format from content type
+ * @example getFileFormat("text/html") // "html"
+ * @example getFileFormat("text/x-unexpected") // ""
+ * @example getFileFormat("text/x-unexpected", "idk") // "idk"
+ * @param {(typeof CONTENT_TYPES)[keyof typeof CONTENT_TYPES]} contentType
+ * @param {(keyof typeof CONTENT_TYPES) | "" | string} [mismatch=""]
+ * @return {(keyof typeof CONTENT_TYPES) | "" | string} 
+ */
 function getFileFormat(contentType, mismatch = "") {
-	return Object.keys(CONTENT_TYPES).find(key => CONTENT_TYPES[key] == contentType) || mismatch;
+	return /**@type {(keyof typeof CONTENT_TYPES) | undefined}*/(Object.keys(CONTENT_TYPES).find(key => CONTENT_TYPES[key] == contentType)) || mismatch;
 }
 
-function getAllFiles(dirPath, depth = Infinity, i = 0, arrayOfFiles = []) {
-	if(i > depth) return arrayOfFiles;
+/**
+ * Recursively resolves all files in directory
+ * @param {string} dirPath Starting directory
+ * @param {number} [depth=Infinity] Max depth of recursion
+ * @return {string[]} 
+ */
+function getAllFiles(dirPath, depth = Infinity) {
+	if(!fs.existsSync(dirPath)) return [];
+	if(!fs.statSync(dirPath).isDirectory()) return [dirPath];
 
-	const files = fs.readdirSync(dirPath);
+	/** @type {{path: string, depth: number}[]} */
+	const queue = [{path: dirPath, depth: 0}];
 
-	files.forEach(function(file) {
-		if(fs.statSync(dirPath + "/" + file).isDirectory()) {
-			arrayOfFiles = getAllFiles(dirPath + "/" + file, depth, i + 1, arrayOfFiles);
-		} else {
-			arrayOfFiles.push(path.join(dirPath, "/", file));
+	/** @type {string[]} */
+	const arrayOfFiles = [];
+
+	while(queue.length) {
+		const dir = queue.shift();
+		if(!dir || dir.depth > depth) continue;
+
+		const files = fs.readdirSync(dir.path);
+
+		for(const file of files) {
+			const pathname = path.join(dir.path, "/", file);
+
+			if(fs.statSync(pathname).isDirectory()) {
+				queue.push({
+					path: pathname,
+					depth: dir.depth + 1
+				});
+			} else {
+				arrayOfFiles.push(pathname);
+			}
 		}
-	});
+	}
 
 	return arrayOfFiles;
 }
