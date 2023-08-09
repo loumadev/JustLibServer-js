@@ -2634,7 +2634,7 @@ function getContentType(filename, mismatch = "text/plain") {
  * @example getFileFormat("text/html") // "html"
  * @example getFileFormat("text/x-unexpected") // ""
  * @example getFileFormat("text/x-unexpected", "idk") // "idk"
- * @param {(typeof CONTENT_TYPES)[keyof typeof CONTENT_TYPES]} contentType
+ * @param {(typeof CONTENT_TYPES)[keyof typeof CONTENT_TYPES] | string} contentType
  * @param {(keyof typeof CONTENT_TYPES) | "" | string} [mismatch=""]
  * @return {(keyof typeof CONTENT_TYPES) | "" | string} 
  */
