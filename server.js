@@ -70,6 +70,106 @@ class Server extends EventListenerStatic {
 	};
 
 	/**
+	 * @typedef {Object} PerformanceInstance
+	 * @prop {bigint} start 
+	 * @prop {bigint} end
+	 * @prop {number} total
+	 * @prop {bigint} last
+	 * @prop {number} delta
+	 * @prop {string} label
+	 * @prop {string} message
+	 * @prop {boolean} isRunning
+	 */
+
+	static Performance = class Performance {
+		/** @type {Object<string, PerformanceInstance>} */
+		static instances = {
+			__default__: {
+				start: 0n,
+				end: 0n,
+				total: 0,
+				last: 0n,
+				delta: 0,
+				label: "default",
+				message: "New time point",
+				isRunning: false
+			}
+		};
+
+		/**
+		 * Starts a new performance measurement instance.
+		 * Can be called multiple times with the same label.
+		 * At the end of the measurement, call `Server.Performance.finish(label)` to finalize the measurement.
+		 * @static
+		 * @param {string} [label="__default__"] Instance label to measure
+		 * @param {string} [message="New time point"] Info for the following measurement
+		 */
+		static measure(label = "__default__", message = "New time point") {
+			const now = process.hrtime.bigint();
+
+			if(!this.instances[label]) this.instances[label] = {
+				start: 0n,
+				end: 0n,
+				total: 0,
+				last: 0n,
+				delta: 0,
+				label: label,
+				message: message,
+				isRunning: false
+			};
+
+			const instance = this.instances[label];
+
+			if(instance.isRunning) {
+				instance.delta = Number(now - instance.last);
+				instance.total = Number(now - instance.start);
+
+				const deltaMs = (instance.delta / 1000000).toFixed(3);
+				const totalMs = (instance.total / 1000000).toFixed(3);
+				const deltaDuration = Server.formatDuration(+deltaMs);
+
+				Server.log(`§7[Performance] [§f${instance.label}§7] [${totalMs}ms] §f${instance.message}§7 ${deltaDuration}§7`);
+
+				instance.message = message;
+			} else {
+				instance.isRunning = true;
+				instance.start = process.hrtime.bigint();
+			}
+
+			instance.last = process.hrtime.bigint();
+		}
+
+		/**
+		 * Finishes the performance measurement instance.
+		 * @static
+		 * @param {string} [label="__default__"] Instance label to finish
+		 * @return {void} 
+		 */
+		static finish(label = "__default__") {
+			const now = process.hrtime.bigint();
+
+			if(!this.instances[label]) return Server.error(`Failed to finish performance measurement: Instance '${label}' does not exist`);
+			if(!this.instances[label].isRunning) return Server.error(`Failed to finish performance measurement: Instance '${label}' is not running`);
+
+			const instance = this.instances[label];
+
+			instance.delta = Number(now - instance.last);
+			instance.total = Number(now - instance.start);
+			instance.end = now;
+			instance.isRunning = false;
+
+			const deltaMs = (instance.delta / 1000000).toFixed(3);
+			const totalMs = (instance.total / 1000000).toFixed(3);
+			const deltaDuration = Server.formatDuration(+deltaMs);
+			const totalDuration = Server.formatDuration(+totalMs, {showSign: false});
+
+			Server.log(`§7[Performance] [§f${instance.label}§7] [${totalMs}ms] §f${instance.message}§7 ${deltaDuration}§7 (Finished in ${totalDuration}§7)`);
+
+			delete this.instances[label];
+		}
+	};
+
+	/**
 	 * HTTP server instance
 	 * @type {http.Server}
 	 */
