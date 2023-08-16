@@ -758,13 +758,9 @@ class Server extends EventListenerStatic {
 				_module.loaded = true;
 
 				// Log the success message
-				const color = [
-					{limit: 500, color: "§4"},
-					{limit: 250, color: "§6"},
-					{limit: -1, color: "§2"}
-				].find(e => duration > e.limit)?.color || "§2";
+				const formattedDuration = this.formatDuration(duration);
 
-				this.log(`§7Loaded §f${project ? `${project}§7:§f` : ""}${filename} §7(${color}+${duration}ms§7)`);
+				this.log(`§7Loaded §f${project ? `${project}§7:§f` : ""}${filename} §7(${formattedDuration}§7)`);
 			} catch(err) {
 				// Mark module as failed
 				_module.failed = true;
@@ -842,6 +838,38 @@ class Server extends EventListenerStatic {
 		fs.writeFileSync(PATH.BLACKLIST, JSON.stringify(this.BLACKLIST));
 
 		this.log(`§7Saved §f${this.BLACKLIST.length} §7blacklisted IPs`);
+	}
+
+	/**
+	 * @typedef {Object} DurationFormatterOptions
+	 * @prop {number[]} [limits] Numerical limits of the durations, in ascending order (where the color changes) (length must be `colors.length - 1`)
+	 * @prop {string[]} [colors] Format color codes present between the limits, in ascending order (length must be `limits.length + 1`)
+	 * @prop {boolean} [showSign] Flag indicating whether to show the sign of the duration
+	 */
+
+	/**
+	 * @static
+	 * @param {number} duration Duration to format
+	 * @param {DurationFormatterOptions} [options={}] Formatter options
+	 * @return {string} Formatted string
+	 * @memberof Server
+	 */
+	static formatDuration(duration, options = {}) {
+		const {
+			limits = [0, 250, 500],
+			colors = ["§1", "§2", "§6", "§4"],
+			showSign = true
+		} = options || {};
+
+		// Check for valid options
+		if(limits.length != colors.length - 1) throw new Error(`Cannot format duration: length of 'limits' must be ${colors.length - 1}, but is ${limits.length}`);
+
+		// Choose the color for the duration based on the options
+		const color = colors[limits.findIndex(e => duration < e)] || colors[colors.length - 1];
+		const sign = !showSign || Math.sign(duration) < 0 ? "" : "+";
+
+		// Format the final string
+		return `${color}${sign}${isNaN(duration) ? NaN : duration}ms`;
 	}
 
 	/**
