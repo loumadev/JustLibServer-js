@@ -2753,7 +2753,8 @@ async function editJSON(path, callback = null) {
  * @return {(typeof CONTENT_TYPES)[keyof typeof CONTENT_TYPES] | string} 
  */
 function getContentType(filename, mismatch = "text/plain") {
-	return CONTENT_TYPES[filename.match(/\.(\w+)$/mi)?.[1]] || mismatch;
+	const index = filename.lastIndexOf(".");
+	return index === -1 ? mismatch : CONTENT_TYPES[filename.slice(index + 1)] || mismatch;
 }
 
 // eslint-disable-next-line valid-jsdoc
