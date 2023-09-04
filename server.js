@@ -1910,12 +1910,26 @@ class RequestEvent extends EventListener.Event {
  * @prop {boolean} [Secure] A secure cookie is only sent to the server when a request is made with the https: scheme.
  */
 class CookieJar {
+	/**
+	 * @typedef {
+		  {
+			headers: ({
+				raw(): {
+					[k: string]: string[]
+				}
+			} | {
+				getSetCookie(): string[]
+			}) & ObjectLiteral
+		} & ObjectLiteral} FetchLikeResponse 
+	 */
+
 	/** @type {
 		((cookie: string, value: string, options?: ObjectLiteral) => this) &
 		((cookie: string[]) => this) &
 		((cookie: CookieJar.Cookie) => this) &
 		((cookie: CookieJar.Cookie[]) => this) &
 		((cookie: http.IncomingMessage) => this) &
+		((cookie: FetchLikeResponse) => this) &
 		((cookie: http.ServerResponse) => this)
 	} */
 	setCookie;
@@ -1993,7 +2007,7 @@ class CookieJar {
 				}
 			}
 
-			//Set by Response object
+			//Set by Response object (http)
 			{
 				const [response] = /**@type {[http.ServerResponse]}*/(args);
 
@@ -2002,6 +2016,30 @@ class CookieJar {
 					if(!cookieString) return this;
 
 					const cookieArray = Array.isArray(cookieString) ? cookieString : [`${cookieString}`];
+					const cookies = CookieJar.Cookie.parse(cookieArray);
+
+					this._addCookiesToJar(...cookies);
+					return this;
+				}
+			}
+
+			//Set by Response object (fetch)
+			{
+				const [response] = /**@type {[FetchLikeResponse]}*/(args);
+
+				/** @type {string[] | undefined} */
+				let cookieArray = undefined;
+
+				// Try the get the cookies from the raw headers somehow
+				if(typeof response?.headers?.getSetCookie === "function") {
+					const cookieArray = response.headers.getSetCookie();
+					if(!cookieArray) return this;
+				} else if(typeof response?.headers?.raw === "function") {
+					const cookieArray = response.headers.raw()["set-cookie"];
+					if(!cookieArray) return this;
+				}
+
+				if(cookieArray) {
 					const cookies = CookieJar.Cookie.parse(cookieArray);
 
 					this._addCookiesToJar(...cookies);
@@ -2022,7 +2060,7 @@ class CookieJar {
 				}
 			}
 
-			throw new TypeError(`Cannot set cookie: ${args[0]}, ${args[1]}, ${args[2]}`);
+			throw new TypeError(`Cannot set cookie: [${args[0]}, ${args[1]}, ${args[2]}]`);
 		};
 
 		// Parse input arguments
