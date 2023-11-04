@@ -247,6 +247,8 @@ class Server extends EventListenerStatic {
 
 			//Create regex from wildcard characters
 			if(["*", "?", ":"].some(e => event.includes(e))) {
+				const _usedNames = {};
+
 				_listener.regex = new RegExp(
 					"^" //Start of the path
 					+ event
@@ -255,7 +257,12 @@ class Server extends EventListenerStatic {
 						.replace(/\*/g, "(.*)") //Replace "*" with "any character(s)"
 						.replace(/:(\w*)/g, (match, name) => { //Replace ":" with "named parameter"
 							if(!name) throw new Error(`Failed to register event handler: Missing parameter name (${event})`);
-							return `(?<${name}>[^/]+?)`;
+
+							// Count same parameter names
+							if(name in _usedNames) _usedNames[name]++;
+							else _usedNames[name] = 0;
+
+							return `(?<${name}${_usedNames[name] > 0 ? _usedNames[name] : ""}>[^/]+?)`;
 						})
 					+ "\/?" //Trailing slash
 					+ "$" //End of the path
