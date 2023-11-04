@@ -303,7 +303,15 @@ class Server extends EventListenerStatic {
 		//CLI
 		if(this.config["enable-cli"]) {
 			this.log("§7Enabling CLI...");
-			this.stdio.cli = new CLI(process);
+			this.stdio.cli = new CLI(
+				process,
+				// Remap backspace key on Linux
+				process.platform === "linux" ? {
+					...KEY,
+					BACKSPACE: KEY.CTRL_BACKSPACE,
+					CTRL_BACKSPACE: KEY.BACKSPACE,
+				} : KEY
+			);
 			this.stdio.cli.begin();
 
 			//Handle default commands
