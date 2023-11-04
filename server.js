@@ -1820,13 +1820,17 @@ class RequestEvent extends EventListener.Event {
 	/**
 	 * Stream file using partial content response
 	 * @param {string} filePath
+	 * @param {number | http.OutgoingHttpHeaders} [status=200]
 	 * @param {http.OutgoingHttpHeaders} [headers={}]
 	 * @returns {Promise<boolean>}
 	 * @memberof RequestEvent
 	 */
-	async streamFile(filePath, headers = {}) {
+	async streamFile(filePath, status = 200, headers = {}) {
 		this.preventDefault();
 		if(this.res.writableEnded) return this._logWriteAfterEndWarning(new Error()), false;
+
+		const _status = (typeof status === "number" ? status : 200) || 200;
+		const _headers = (typeof status === "object" ? status : headers) || {};
 
 		const contentType = getContentType(filePath);
 		const stat = await fs.promises.stat(filePath).catch(() => { });
@@ -1838,25 +1842,25 @@ class RequestEvent extends EventListener.Event {
 		const range = Server.readRangeHeader(this.req, stat.size);
 
 		if(!range) {
-			headers["Content-Length"] = stat.size;
-			this.send(fs.createReadStream(filePath), 200, contentType, headers);
+			_headers["Content-Length"] = stat.size;
+			this.send(fs.createReadStream(filePath), _status, contentType, _headers);
 			return true;
 		}
 
 		//Request cannot be fulfilled due to incorrect range
 		if(range.start >= stat.size || range.end >= stat.size) {
 			//Send correct range
-			headers["Content-Range"] = `bytes */${stat.size}`;
-			this.send("416 Range Not Satisfiable", 416, contentType, headers);
+			_headers["Content-Range"] = `bytes */${stat.size}`;
+			this.send("416 Range Not Satisfiable", 416, contentType, _headers);
 		} else {
 			//Set up headers
-			headers["Content-Range"] = `bytes ${range.start}-${range.end}/${stat.size}`;
-			headers["Content-Length"] = range.start == range.end ? 0 : (range.end - range.start + 1);
-			headers["Accept-Ranges"] = "bytes";
+			_headers["Content-Range"] = `bytes ${range.start}-${range.end}/${stat.size}`;
+			_headers["Content-Length"] = range.start == range.end ? 0 : (range.end - range.start + 1);
+			_headers["Accept-Ranges"] = "bytes";
 			//headers["Cache-Control"] = "no-cache";
 
 			//Send part of file
-			this.send(fs.createReadStream(filePath, range), 206, contentType, headers);
+			this.send(fs.createReadStream(filePath, range), 206, contentType, _headers);
 		}
 		return true;
 	}
