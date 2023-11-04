@@ -1862,6 +1862,25 @@ class RequestEvent extends EventListener.Event {
 	}
 
 	/**
+	 * Stream resource from public directory
+	 * @param {string} filePath
+	 * @param {number} [status=200]
+	 * @param {http.OutgoingHttpHeaders} [headers={}]
+	 * @returns {Promise<boolean>}
+	 * @memberof RequestEvent
+	 */
+	async streamPublicFile(filePath, status = 200, headers = {}) {
+		const resolvedPath = Server.resolvePublicResource(filePath);
+
+		if(!resolvedPath) {
+			Server._handleNotFound(this);
+			return false;
+		}
+
+		return this.streamFile(resolvedPath, status, headers);
+	}
+
+	/**
 	 * Set header to be sent with response
 	 * @param {string} name
 	 * @param {number | string | ReadonlyArray<string>} value
