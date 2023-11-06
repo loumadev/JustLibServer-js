@@ -115,6 +115,8 @@ class CLI extends EventListener {
 		targetStream.__write.apply(targetStream, ["\r\x1b[K" + (this.printCommand ? cli.prompt + input + "\r\n" : "") + cli.prompt]);
 
 		//Events
+		this.dispatchEvent("input", {input});
+
 		if(this.awaitingInputsQueue.length == 0) {
 			this.dispatchEvent("command", {input, command, args}, event => {
 				this.dispatchEvent("unknownCommand", event);
@@ -124,8 +126,6 @@ class CLI extends EventListener {
 			awaitingInput.resolve(input);
 			this.setPrompt(awaitingInput.cachePrompt);
 		}
-
-		this.dispatchEvent("input", {input});
 
 		if(this.awaitingInputsQueue.length > 0) {
 			const awaitingInput = this.awaitingInputsQueue[0];

@@ -394,6 +394,11 @@ class Server extends EventListenerStatic {
 				e.preventDefault();
 			});
 
+			// Log input
+			this.stdio.cli.on("input", e => {
+				this.loggerStream?.write(`${this.stdio.cli?.prompt}${e.input}\n`);
+			});
+
 			//Unknown command handler
 			this.stdio.cli.on("unknownCommand", e => {
 				if(e.defaultPrevented || !this.unknownCommandError) return;
