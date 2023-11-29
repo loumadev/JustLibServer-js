@@ -489,6 +489,12 @@ class Server extends EventListenerStatic {
 			this.error("Unhandled Promise Rejection at:", promise);
 		});
 
+		process.on("uncaughtException", err => {
+			this.error("Uncaught Exception:", err);
+
+			this.stop(1);
+		});
+
 		const startDate = new Date();
 		this.log("§7Starting initialization...");
 
