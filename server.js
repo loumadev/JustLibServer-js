@@ -169,6 +169,203 @@ class Server extends EventListenerStatic {
 		}
 	};
 
+
+	/**
+	 * @template T
+	 * @typedef {Object} TaskScheduleOptions
+	 * @prop {string} name 
+	 * @prop {() => T} task 
+	 * @prop {boolean} [force=false] 
+	 * @prop {number} [delay=0] 
+	 */
+
+	/**
+	 * @template T
+	 * @typedef {Object} ScheduledPromise
+	 * @prop {Promise<T> | null} promise
+	 * @prop {((taskPromise: T) => void) | null} resolve
+	 * @prop {((error: any) => void) | null} reject
+	 */
+
+	/**
+	 * @template T
+	 * @typedef {Object} ScheduledTask
+	 * @prop {ScheduledPromise<T>} promise 
+	 * @prop {Array<ScheduledPromise<T>>} inheritedPromises
+	 * @prop {TaskScheduleOptions<T>} options 
+	 * @prop {number} scheduledAt
+	 * @prop {number} runAt
+	 * @prop {boolean} isRunning
+	 * @prop {NodeJS.Timeout | null} timeout
+	 */
+
+	/**
+	 * @class
+	 * @static
+	 * @memberof Server
+	 */
+	static TaskManager = class TaskManager {
+		/** @type {Record<string, ScheduledTask<any>>} */
+		static tasks = {};
+
+		/** @type {boolean} */
+		static acceptTasks = true;
+
+		// eslint-disable-next-line valid-jsdoc
+		/**
+		 * @static
+		 * @template T
+		 * @param {TaskScheduleOptions<T>} options
+		 * @returns {Promise<T> | null}
+		 */
+		static scheduleTask(options) {
+			if(!this.acceptTasks) return null;
+
+			/** @type {ScheduledTask<T>} */
+			const existingTask = this.tasks[options.name];
+
+			// Task already exists
+			if(existingTask) {
+				// In case this is forced, but task is already running, wait for it to finish and then run it again
+				if(existingTask.isRunning) {
+					if(!existingTask.promise.promise) throw new Error(`InternalError: Failed to schedule task "${options.name}": Task is running but has no promise`);
+
+					return existingTask.promise.promise.then(() => {
+						// Recalculate the new schedule time
+						return this._createTask(options);
+					});
+				}
+
+				// In case this is not forced, return existing task
+				if(options.force) {
+					return this._createTask(options, 0);
+				}
+
+				// Clear existing timeout
+				if(existingTask.timeout) {
+					clearTimeout(existingTask.timeout);
+					existingTask.timeout = null;
+				}
+
+				// Recalculate the new schedule time
+				const delta = existingTask.runAt - Date.now();
+
+				// Create new task
+				return this._createTask(options, delta);
+			}
+
+			// Create new task
+			return this._createTask(options);
+		}
+
+		// eslint-disable-next-line valid-jsdoc
+		/**
+		 * @static
+		 * @template T
+		 * @param {TaskScheduleOptions<T>} options
+		 * @param {number} [delay=0]
+		 * @returns {Promise<ReturnType<TaskScheduleOptions<T>["task"]>>}
+		 */
+		static async _createTask(options, delay = options.delay || 0) {
+			const name = options.name;
+			const timeout = setTimeout(() => this._runTask(this.tasks[name]), delay);
+			const now = Date.now();
+
+			const existingTask = this.tasks[name];
+
+			// Create the task object
+			/** @type {ScheduledTask<T>} */
+			const task = {
+				promise: {
+					promise: null,
+					resolve: null,
+					reject: null
+				},
+				inheritedPromises: existingTask ? [...existingTask.inheritedPromises, existingTask.promise] : [],
+				options,
+				scheduledAt: now,
+				runAt: now + delay,
+				isRunning: false,
+				timeout: timeout
+			};
+			this.tasks[name] = task;
+
+			// Create the promise
+			const promise = new Promise((resolve, reject) => {
+				task.promise.resolve = resolve;
+				task.promise.reject = reject;
+			});
+
+			// Set the promise
+			task.promise.promise = promise;
+
+			return promise;
+		}
+
+		/**
+		 * @static
+		 * @template T
+		 * @param {ScheduledTask<T>} task
+		 */
+		static async _runTask(task) {
+			if(!task) return;
+
+			// Check if task is already running
+			if(task.isRunning) return;
+
+			// Clear timeout
+			if(task.timeout) {
+				clearTimeout(task.timeout);
+				task.timeout = null;
+			}
+
+			// Mark task as running
+			task.isRunning = true;
+
+			try {
+				// Run task
+				const taskPromise = task.options.task();
+
+				// Resolve inherited promises
+				for(const promise of task.inheritedPromises) {
+					if(!promise.resolve) throw new Error(`InternalError: Failed to resolve task "${task.options.name}": Inherited promise has no resolve function`);
+					promise.resolve(taskPromise);
+				}
+
+				// Resolve scheduler promise
+				if(!task.promise.resolve) throw new Error(`InternalError: Failed to resolve task "${task.options.name}": Task has no resolve function`);
+				task.promise.resolve(taskPromise);
+
+				// Wait for task to finish
+				await taskPromise;
+			} catch(err) {
+				Server.error(`[Task] Task "${task.options.name}" failed: `, err);
+			}
+
+			// Remove task from list
+			delete this.tasks[task.options.name];
+		}
+
+		/**
+		 * @static
+		 * @return {Promise<PromiseSettledResult<any>[]>} 
+		 */
+		static async _runAllTasks() {
+			const promises = [];
+
+			for(const task of Object.values(this.tasks)) {
+				if(task.isRunning) {
+					if(task.promise.promise) promises.push(task.promise.promise);
+					continue;
+				}
+
+				promises.push(this._runTask(task));
+			}
+
+			return Promise.allSettled(promises);
+		}
+	};
+
 	/**
 	 * HTTP server instance
 	 * @type {http.Server}
@@ -502,9 +699,20 @@ class Server extends EventListenerStatic {
 		this._saveBlacklist();
 
 		this.dispatchEvent("unload", {forced: force, async: true}).then(() => {
-			this.log("§cServer stopped");
-			if(this.loggerStream) this.loggerStream.end(() => process.exit(code));
-			else process.exit(code);
+			// Run all scheduled tasks
+			const tasks = Object.values(this.TaskManager.tasks);
+			if(tasks.length > 0) this.log(`§7Running ${tasks.length} scheduled task(s)...`);
+
+			this.TaskManager.acceptTasks = false;
+			this.TaskManager._runAllTasks().then(() => {
+				this.log("§7All scheduled tasks finished");
+				this.log("§cServer stopped");
+				if(this.loggerStream) this.loggerStream.end(() => {
+					this.loggerStream?.close();
+					process.exit(code);
+				});
+				else process.exit(code);
+			});
 		});
 	}
 
