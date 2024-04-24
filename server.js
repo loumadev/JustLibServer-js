@@ -4,6 +4,8 @@ const formidable = require("formidable");
 const http = require("http");
 const path = require("path");
 const util = require("util");
+const inspector = require("inspector");
+const vm = require("vm");
 const fs = require("fs");
 const {EventListenerStatic, EventListener, fixDigits, iterate, getQueryParameters, objectDeepMerge, timeout, JLListener, JLEvent} = require("./JustLib.js");
 const {CLI, KEY} = require("./CLI");
@@ -364,6 +366,137 @@ class Server extends EventListenerStatic {
 			}
 
 			return Promise.allSettled(promises);
+		}
+	};
+
+
+	/**
+	 * @typedef {Object} InspectorContext
+	 * @prop {vm.Context} context 
+	 * @prop {number} id 
+	 */
+
+	/**
+	 * @class
+	 * @static
+	 * @memberof Server
+	 */
+	static InspectorService = class InspectorService {
+		static SESSION_CACHE_DURATION_MS = 1000 * 60 * 10; // 10 minutes
+		static SESSION_CACHE_RENEW_MS = 1000 * 60 * 3; // 3 minutes
+
+		/** @type {inspector.Session | null} */
+		static session = null;
+
+		/** @type {NodeJS.Timeout | null} */
+		static _cacheTimout = null;
+
+		/** @type {number} */
+		static _lastUse = 0;
+
+		/**
+		 * @returns {inspector.Session}
+		 * @memberof InspectorService
+		 */
+		static getSession() {
+			// Create a new session if it doesn't exist
+			if(!this.session) {
+				this.session = new inspector.Session();
+				this.connect();
+			}
+
+			// Tell the cache that the session is being used
+			this._renewSession();
+
+			return this.session;
+		}
+
+		/**
+		 * @memberof InspectorService
+		 */
+		static connect() {
+			const session = this.getSession();
+			session.connect();
+			session.post("Runtime.enable");
+		}
+
+		/**
+		 * @memberof InspectorService
+		 */
+		static disconnect() {
+			if(!this.session) return;
+			this.session.post("Runtime.disable");
+			this.session.disconnect();
+			this.session = null;
+		}
+
+		/**
+		 * @param {Object} object
+		 * @returns {Promise<InspectorContext>}
+		 * @memberof InspectorService
+		 */
+		static async createContext(object) {
+			const session = this.getSession();
+
+			// Setup the listener for the context id
+			const contextId = new Promise(resolve => {
+				session.once("Runtime.executionContextCreated", res => {
+					resolve(res.params.context.id);
+				});
+			});
+
+			// Create the context
+			const context = vm.createContext(object);
+
+			// Wait for the context id to be set
+			const id = await contextId;
+
+			// Return the context and the id
+			return {context, id};
+		}
+
+		/**
+		 * @param {string} method
+		 * @param {Object} [params={}]
+		 * @returns {Promise<Object>}
+		 * @memberof InspectorService
+		 */
+		static async post(method, params) {
+			const session = this.getSession();
+
+			return new Promise((resolve, reject) => {
+				session.post(method, params, (error, res) => {
+					if(error) {
+						reject(error);
+					} else {
+						resolve(res);
+					}
+				});
+			});
+		}
+
+		/**
+		 * @private
+		 * @memberof InspectorService
+		 */
+		static _renewSession() {
+			const now = Date.now();
+
+			// Renew the session if it's been too long
+			if(now - this._lastUse > this.SESSION_CACHE_RENEW_MS) {
+				// Clear the cache timeout
+				if(this._cacheTimout) {
+					clearTimeout(this._cacheTimout);
+				}
+
+				// Set up the cache timeout
+				this._cacheTimout = setTimeout(() => {
+					this.session?.disconnect();
+				}, this.SESSION_CACHE_DURATION_MS);
+			}
+
+			// Update the last use time
+			this._lastUse = now;
 		}
 	};
 
@@ -1009,6 +1142,20 @@ class Server extends EventListenerStatic {
 			this.log(`Blacklisted IPs(${this.BLACKLIST.length}):\n${this.BLACKLIST.join("\n")}`);
 		}));
 
+		/** @type {InspectorContext | null} */
+		let evalContext = null;
+		this.InspectorService.createContext({
+			Server,
+			require,
+			module,
+			process,
+			console,
+			setTimeout,
+			setInterval,
+			clearTimeout,
+			clearInterval,
+		}).then(context => evalContext = context);
+
 		const evalCmd = new Command("eval", [
 			Variable("code", {type: "string", isRest: true, comment: "Code to evaluate"})
 		], async (e) => {
@@ -1019,6 +1166,46 @@ class Server extends EventListenerStatic {
 			} catch(err) {
 				this.log(`[EVAL ERROR]: ${err?.message || `Unknown error (${err?.message})`}`);
 			}
+		});
+		evalCmd.on("preview", async (e) => {
+			// Early return if the context is not ready yet
+			if(!evalContext) return;
+
+			const {code} = e.variables;
+
+			const source = code.join(" ");
+
+			const result = await this.InspectorService.post("Runtime.evaluate", {
+				expression: source,
+				contextId: evalContext.id,
+				throwOnSideEffect: true,
+				timeout: 300
+			});
+
+			if(result.result.type === "undefined") return;
+
+			if(result.exceptionDetails) {
+				const description = result.exceptionDetails.exception.description;
+
+				const messageEnd = description.indexOf("\n");
+				if(messageEnd === -1) return;
+
+				const message = description.slice(0, messageEnd);
+				if(message.indexOf("Possible side-effect") !== -1) return;
+
+				e.preview = `§4${message}`;
+				return;
+			}
+
+			try {
+				const value = eval(source);
+				e.preview = util.formatWithOptions({
+					colors: true,
+					depth: 1,
+					compact: true,
+					breakLength: Infinity,
+				}, "%O", value).slice(0, Math.min(180, this.stdio.cli?.stdout.columns || 120) * 0.75);
+			} catch(err) { }
 		});
 		this.stdio.cli.registerCommand(evalCmd);
 
