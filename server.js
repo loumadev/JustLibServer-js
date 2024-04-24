@@ -558,54 +558,22 @@ class Server extends EventListenerStatic {
 	/** @type {fs.WriteStream | null} */
 	static loggerStream = null;
 
+	/** @type {{regex: RegExp, listener: JLListener}[]} */
+	static _listenersRegexCache = [];
+
 	/**
 	 * @type {
-		((event: string, listener: (event: RequestEvent) => void) => EventListener.Listener) &
-		((event: "request", listener: (event: RequestEvent) => void) => EventListener.Listener) &
-		((event: "load", listener: (event: EventListener.Event) => void) => EventListener.Listener) &
-		((event: "unload", listener: (event: EventListener.Event & {forced: boolean}) => void) => EventListener.Listener) &
-		((event: "404", listener: (event: RequestEvent) => void) => EventListener.Listener) &
-		((event: "500", listener: (event: RequestEvent) => void) => EventListener.Listener)
+		typeof EventListenerStatic["on"] &
+		((event: string, listener: (event: RequestEvent) => void) => JLListener) &
+		((event: "request", listener: (event: RequestEvent) => void) => JLListener) &
+		((event: "load", listener: (event: JLEvent) => void) => JLListener) &
+		((event: "unload", listener: (event: JLEvent & {forced: boolean}) => void) => JLListener) &
+		((event: "404", listener: (event: RequestEvent) => void) => JLListener) &
+		((event: "500", listener: (event: RequestEvent) => void) => JLListener)
 	   }
 	 */
-	static on = (() => {
-		const __on = this.on;
-
-		//Generate regex expression for event handlers
-		return (function(/**@type {string}*/event) {
-			//Create a new event listener
-			const _listener = __on.apply(this, arguments);
-
-			//Create regex from wildcard characters
-			if(["*", "?", ":"].some(e => event.includes(e))) {
-				const _usedNames = {};
-
-				_listener.regex = new RegExp(
-					"^" //Start of the path
-					+ event
-						.replace(/(\.|\(|\)|\[|\]|\||\{|\}|\+|\^|\$|\/|\-|\\)/g, "\\$1") //Escape special characters
-						.replace(/\?/g, "(.)") //Replace "?" with "any character"
-						.replace(/\*/g, "(.*)") //Replace "*" with "any character(s)"
-						.replace(/:(\w*)/g, (match, name) => { //Replace ":" with "named parameter"
-							if(!name) throw new Error(`Failed to register event handler: Missing parameter name (${event})`);
-
-							// Count same parameter names
-							if(name in _usedNames) _usedNames[name]++;
-							else _usedNames[name] = 0;
-
-							return `(?<${name}${_usedNames[name] > 0 ? _usedNames[name] : ""}>[^/]+?)`;
-						})
-					+ "\/?" //Trailing slash
-					+ "$" //End of the path
-					, "i");
-			} else {
-				//Event does not contain any wildcards or is not a http request handler
-				_listener.regex = null;
-			}
-
-			return _listener;
-		}).bind(this);
-	})();
+	// @ts-ignore
+	static on = this.on;
 
 	/**
 	 * @static
@@ -739,6 +707,9 @@ class Server extends EventListenerStatic {
 		} else {
 			this.log(`§6HTTP server is disabled!`);
 		}
+
+		// Add event listener for wildcard characters
+		Server._registerAddListenerHandler();
 
 		//Modules
 		this._loadModules();
@@ -907,56 +878,52 @@ class Server extends EventListenerStatic {
 			if(EventObject.defaultPrevented) return;
 
 			//Dynamic destination path search
-			const searchDispatched = [];
 			const listenerPromises = [];
 
-			for(const listener of this.listeners) {
+			//Listener uses dynamic representation of destination path
+			for(const {regex, listener} of this._listenersRegexCache) {
 				const type = listener.type;
 
-				//Event was prevented
-				if(EventObject.defaultPrevented) break;
+				// Event propagation was stopped
+				if(EventObject.isStopped) break;
 
-				//Event was already dispatched
-				if(searchDispatched.includes(type)) continue;
+				// Try to match the destination path with the regex
+				const match = destinationPath.match(regex);
 
-				//Listener uses dynamic representation of destination path
-				if(listener.regex) {
-					const match = destinationPath.match(listener.regex);
+				// Destination path does not match required pattern
+				if(!match) continue;
 
-					//Destination path does not match required pattern
-					if(!match) continue;
-
-					//Add found matches to EventObject
-					// @ts-ignore
-					EventObject.matches = match.slice(1);
-					EventObject.matches.matches = EventObject.matches;
-					if(match.groups) {
-						Object.assign(EventObject.matches, match.groups);
-					}
-
-					//Dispatch matched event
-					searchDispatched.push(type);
-					listenerPromises.push(this.dispatchEvent(type, EventObject));
+				// Add found matches to EventObject
+				// @ts-ignore
+				EventObject.matches = match.slice(1);
+				EventObject.matches.matches = EventObject.matches;
+				if(match.groups) {
+					Object.assign(EventObject.matches, match.groups);
 				}
+
+				// Call the listener manually to prevent unnecessary overhead
+				EventObject.type = type;
+				listenerPromises.push(listener.callback(EventObject));
 			}
 
 			//Wait for all listeners to finish
 			await Promise.all(listenerPromises);
 		})().then(() => {
-			//All listeners were processed
+			// All listeners were processed
 
-			//If no listeners responded (prevented default action), try to serve static file
-			if(!EventObject.defaultPrevented) {
-				if(res.writableEnded) return this.warn(`Failed to write response after end. (Default action has not been prevented)`);
+			// If no listeners responded (prevented default action), try to serve static file
+			if(EventObject.defaultPrevented) return;
 
-				//The request path might be vulnerable
-				if(!EventObject.resolvedPath) return EventObject.send("404 Not Found", 404);
+			// Prevent from writing to closed socket
+			if(res.writableEnded) return this.warn(`Failed to write response after end. (Default action has not been prevented)`);
 
-				//Serve static file. This call will internally respond with 404 if file is not found.
-				EventObject.streamFile(EventObject.resolvedPath);
-			}
+			// The request path might be vulnerable
+			if(!EventObject.resolvedPath) return EventObject.send("404 Not Found", 404);
+
+			// Serve static file. This call will internally respond with 404 if file is not found.
+			EventObject.streamFile(EventObject.resolvedPath);
 		}).catch(err => {
-			//Catch all errors and process them
+			// Catch all errors and process them
 			this._handleInternalError(EventObject, err);
 		});
 	}
@@ -1305,6 +1272,49 @@ class Server extends EventListenerStatic {
 		}));
 	}
 
+	/**
+	 * Registers add event handler for wildcard characters
+	 * @private
+	 * @static
+	 * @memberof Server
+	 */
+	static _registerAddListenerHandler() {
+		this.on(EventListener.LISTENER_ADD_EVENT, e => {
+			const listener = e.listener;
+			const type = listener.type;
+
+			// Only create regex for event handlers with wildcard characters
+			if(!["*", "?", ":"].some(e => type.includes(e))) {
+				return;
+			}
+
+			const usedNames = {};
+
+			// Create regex from wildcard characters
+			const regex = new RegExp(
+				"^" // Start of the path
+				+ type
+					.replace(/(\.|\(|\)|\[|\]|\||\{|\}|\+|\^|\$|\/|\-|\\)/g, "\\$1") // Escape special characters
+					.replace(/\?/g, "(.)") // Replace "?" with "any character"
+					.replace(/\*/g, "(.*)") // Replace "*" with "any character(s)"
+					.replace(/:(\w*)/g, (match, name) => {
+						if(!name) throw new Error(`Failed to register event handler: Missing parameter name (${type})`);
+
+						// Count same parameter names
+						if(name in usedNames) usedNames[name]++;
+						else usedNames[name] = 0;
+
+						return `(?<${name}${usedNames[name] > 0 ? usedNames[name] : ""}>[^/]+?)`;
+					})
+				+ "\/?" // Trailing slash
+				+ "$" // End of the path
+				,
+				"i");
+
+			// Add regex to cache
+			this._listenersRegexCache.push({regex, listener});
+		});
+	}
 
 	/**
 	 * Loads the configuration file
