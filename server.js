@@ -775,7 +775,7 @@ class Server extends EventListenerStatic {
 		if(this.config["enable-http-server"] && this.http && this.http.listening) this.http.close();
 		this._saveBlacklist();
 
-		this.dispatchEvent("unload", {forced: force, async: true}).then(() => {
+		this.dispatchEvent("unload", {forced: force, async: true, defaultPreventable: false}).then(() => {
 			// Run all scheduled tasks
 			const tasks = Object.values(this.TaskManager.tasks);
 			if(tasks.length > 0) this.log(`§7Running ${tasks.length} scheduled task(s)...`);
