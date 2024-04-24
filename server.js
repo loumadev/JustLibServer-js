@@ -5,8 +5,9 @@ const http = require("http");
 const path = require("path");
 const util = require("util");
 const fs = require("fs");
-const {EventListenerStatic, EventListener, fixDigits, iterate, getQueryParameters, objectDeepMerge} = require("./JustLib.js");
+const {EventListenerStatic, EventListener, fixDigits, iterate, getQueryParameters, objectDeepMerge, timeout, JLListener, JLEvent} = require("./JustLib.js");
 const {CLI, KEY} = require("./CLI");
+const {Command, Variable, Optional, Keyword} = require("./command.js");
 
 const btoa = data => Buffer.from(data, "binary").toString("base64");
 const atob = data => Buffer.from(data, "base64").toString("binary");
@@ -524,77 +525,15 @@ class Server extends EventListenerStatic {
 			);
 			this.stdio.cli.begin();
 
-			//Handle default commands
-			this.stdio.cli.on("command", async e => {
-				const {input, command, args} = e;
+			// Register the available commands
+			this._registerCommands();
 
-				if(command == "stop") {
-					const isForced = args[0] == "force";
-					this.stop(0, isForced);
-				} else if(command == "help") {
-					this.log("§eCommands:\n§bStop §f- §aStop server\n§bHelp §f- §aShow this menu");
-				} else if(command == "clear") {
-					console.clear();
-				} else if(command == "ban") {
-					const [ip] = args;
-					const ipRegex = /((^\s*((([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5]))\s*$)|(^\s*((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))(%.+)?\s*$))/;
-
-					if(ipRegex.test(ip)) {
-						this.BLACKLIST.push(ip);
-						this.log(`IP ${ip} has been banned`);
-						this._saveBlacklist();
-					} else this.log(`§c[ERROR]: Invalid IPv4 or IPv6 address`);
-				} else if(command == "unban") {
-					const [ip] = args;
-					const index = this.BLACKLIST.indexOf(ip);
-
-					if(index > -1) {
-						this.BLACKLIST.splice(index, 1);
-						this.log(`IP ${ip} has been unbanned`);
-						this._saveBlacklist();
-					} else this.log(`§c[ERROR]: Provided IP address is not banned`);
-				} else if(command == "banlist") {
-					this.log(`Blacklisted IPs(${this.BLACKLIST.length}):\n${this.BLACKLIST.join("\n")}`);
-				} else if(command == "eval") {
-					try {
-						e.preventDefault();
-						this.log(util.formatWithOptions({colors: true}, "< %O", await eval(args.join(" "))));
-					} catch(e) {
-						this.log(`[EVAL ERROR]: ${e?.message || `Unknown error (${e?.message})`}`);
-					}
-				} else if(command == "exec") {
-					const [filePath = "autoexec.cfg"] = args;
-
-					fs.promises.readFile(path.join(__dirname, filePath)).then(file => {
-						Server.log(`Executing ${filePath}...`);
-						this.stdio.cli?.sendInput(file.toString());
-					}).catch(err => {
-						this.log(`§c[ERROR]: ${err.message}`);
-					});
-				} else if(command == "who") {
-					e.preventDefault();
-
-					if(!this.ssh) return this.error("SSH server is not enabled!");
-
-					const connections = this.ssh.connections;
-
-					if(connections.length == 0) return this.log("No connections");
-
-					this.log(`Active connections(${connections.length}):`);
-
-					const maxUsername = connections.reduce((max, connection) => Math.max(max, connection.username.length), 0);
-					const maxDate = connections.reduce((max, connection) => Math.max(max, connection.date.toISOString().replace("T", " ").slice(0, 19).length), 0);
-					const maxIP = connections.reduce((max, connection) => Math.max(max, connection.ip.length), 0);
-
-					for(const connection of connections) {
-						this.log(`${connection.username.padEnd(maxUsername)}  ${connection.ip.padEnd(maxIP)}  ${connection.date.toISOString().replace("T", " ").slice(0, 19).padEnd(maxDate)}`);
-					}
-
-				} else if(command == "") {
-
-				} else return;
-
+			//Unknown command handler
+			this.stdio.cli.on("unknownCommand", e => {
+				if(e.defaultPrevented) return;
 				e.preventDefault();
+
+				this.error("Unknown command. Write \"help\" for help.");
 			});
 
 			// Log input
@@ -602,16 +541,15 @@ class Server extends EventListenerStatic {
 				this.loggerStream?.write(`${this.stdio.cli?.prompt}${e.input}\n`);
 			});
 
-			//Unknown command handler
-			this.stdio.cli.on("unknownCommand", e => {
-				if(e.defaultPrevented || !this.unknownCommandError) return;
-				this.log("§cUnknown command. Write \"help\" for help.");
+			// SIGINT handler
+			this.stdio.cli.on("SIGINT", e => {
+				// Need to prevent default behavior to avoid killing the process
+				e.preventDefault();
+
+				// Gracefully stop the server and exit with code 130 (SIGINT) 
+				this.stop(130, true);
 			});
 
-			/*fs.writeFileSync("stdout.log", "");
-			this.stdio.cli.on("stdout", ({string} = e) => {
-				fs.appendFileSync("stdout.log", string);
-			});*/
 			this.log("§7CLI enabled");
 
 			//SSH Server
@@ -998,6 +936,188 @@ class Server extends EventListenerStatic {
 	static _connectionLog(status) {
 		this.log(`§8Connection closed (${status})`);
 	}
+
+	/**
+	 * Registers all commands for the CLI
+	 * @private
+	 * @static
+	 * @memberof Server
+	 */
+	static _registerCommands() {
+		if(!this.stdio.cli) return;
+
+		this.stdio.cli.registerCommand(new Command("stop", [
+			Optional([
+				Variable("force", {type: "flag"})
+			])
+		], e => {
+			const {force} = e.variables;
+
+			this.stop(0, force);
+		}));
+
+		this.stdio.cli.registerCommand(new Command("kill", [], e => {
+			this.stdio.cli?.getInput("Are you sure you want to kill the server process without proper shutdown (y/N)? > ").then(async input => {
+				if(input.toLowerCase() !== "y") return this.log("Aborted");
+				process.exit(1);
+			});
+		}));
+
+		this.stdio.cli.registerCommand(new Command("sleep", [
+			Variable("time", {type: "number", comment: "Time to sleep in milliseconds"})
+		], e => {
+			const {time} = e.variables;
+
+			this.stdio.cli?.pause();
+			setTimeout(() => this.stdio.cli?.resume(), time);
+		}));
+
+		this.stdio.cli.registerCommand(new Command("help", [], e => {
+			for(const command of this.stdio.cli?.commands || []) {
+				this.log(command.toString());
+			}
+		}));
+
+		this.stdio.cli.registerCommand(new Command("clear", [], e => {
+			console.clear();
+		}));
+
+		this.stdio.cli.registerCommand(new Command("ban", [
+			Variable("ip", {type: "string", comment: "IP address to ban"})
+		], e => {
+			const {ip} = e.variables;
+
+			this.BLACKLIST.push(ip);
+			this.log(`IP ${ip} has been banned`);
+			this._saveBlacklist();
+		}));
+
+		this.stdio.cli.registerCommand(new Command("unban", [
+			Variable("ip", {type: "string", comment: "IP address to unban"})
+		], e => {
+			const {ip} = e.variables;
+
+			const index = this.BLACKLIST.indexOf(ip);
+			if(index === -1) return this.log(`§c[ERROR]: Provided IP address is not banned`);
+
+			this.BLACKLIST.splice(index, 1);
+			this.log(`IP ${ip} has been unbanned`);
+			this._saveBlacklist();
+		}));
+
+		this.stdio.cli.registerCommand(new Command("banlist", [], e => {
+			this.log(`Blacklisted IPs(${this.BLACKLIST.length}):\n${this.BLACKLIST.join("\n")}`);
+		}));
+
+		const evalCmd = new Command("eval", [
+			Variable("code", {type: "string", isRest: true, comment: "Code to evaluate"})
+		], async (e) => {
+			const {code} = e.variables;
+
+			try {
+				this.log(util.formatWithOptions({colors: true}, "< %O", await eval(code.join(" "))));
+			} catch(err) {
+				this.log(`[EVAL ERROR]: ${err?.message || `Unknown error (${err?.message})`}`);
+			}
+		});
+		this.stdio.cli.registerCommand(evalCmd);
+
+		this.stdio.cli.registerCommand(new Command("exec", [
+			Optional([
+				Variable("filePath", {type: "string", comment: "Path to the file to execute"})
+			])
+		], e => {
+			const {filePath} = e.variables;
+
+			fs.promises.readFile(path.join(__dirname, filePath || "autoexec.cfg")).then(file => {
+				Server.log(`Executing ${filePath}...`);
+				this.stdio.cli?.sendInput(file.toString());
+			}).catch(err => {
+				this.log(`§c[ERROR]: ${err.message}`);
+			});
+		}));
+
+		this.stdio.cli.registerCommand(new Command("task", [
+			Keyword("list", {comment: "List all scheduled tasks"})
+		], e => {
+			const tasks = Object.values(this.TaskManager.tasks);
+
+			if(tasks.length === 0) return this.log("No scheduled tasks");
+
+			const now = Date.now();
+			const header = ["Name", "Scheduled at", "Run at", "Delay", "Status", "Repeating"];
+
+			const rows = tasks.map(task => {
+				const {scheduledAt, runAt, options} = task;
+				const name = options.name;
+				const delay = options.delay || 0;
+				const status = `${task.isRunning ? `§aRunning (${this.formatDuration(now - runAt)})` : `§6Waiting (${this.formatDuration(runAt - now)})`}§r`;
+				const repeating = /*options.repeating*/ false ? "Yes" : "No";
+
+				return [
+					name,
+					new Date(scheduledAt).toISOString().replace("T", " ").slice(0, 19),
+					new Date(runAt).toISOString().replace("T", " ").slice(0, 19),
+					`${delay}ms`,
+					status,
+					repeating
+				];
+			});
+
+			const max = rows.reduce((max, row) => {
+				return row.map((cell, i) => Math.max(max[i], cell.length));
+			}, header.map(() => 0));
+
+			const table = [header, ...rows].map((row, i) => {
+				return row.map((cell, j) => cell.padEnd(max[j] - (i === 0 && j === 4 ? 4 : 0))).join("  ");
+			}).join("\n");
+
+			this.log(`Scheduled tasks(${tasks.length}):\n${table}`);
+		}));
+
+		this.stdio.cli.registerCommand(new Command("task", [
+			Keyword("cancel", {comment: "Cancel a scheduled task"}),
+			Variable("name", {type: "string", comment: "Name of the task to cancel"})
+		], e => {
+			const {name} = e.variables;
+
+			const task = this.TaskManager.tasks[name];
+
+			if(!task) return this.log(`§c[ERROR]: Task '${name}' does not exist`);
+
+			if(task.isRunning) return this.log(`§c[ERROR]: Task '${name}' is running`);
+
+			if(task.timeout) {
+				clearTimeout(task.timeout);
+				task.timeout = null;
+			}
+
+			delete this.TaskManager.tasks[name];
+
+			this.log(`Task '${name}' has been canceled`);
+		}));
+
+		this.stdio.cli.registerCommand(new Command("task", [
+			Keyword("run", {comment: "Run a scheduled task"}),
+			Variable("name", {type: "string", comment: "Name of the task to run"})
+		], e => {
+			const {name} = e.variables;
+
+			const task = this.TaskManager.tasks[name];
+
+			if(!task) return this.log(`§c[ERROR]: Task '${name}' does not exist`);
+
+			if(task.isRunning) return this.log(`§c[ERROR]: Task '${name}' is already running`);
+
+			if(task.timeout) {
+				clearTimeout(task.timeout);
+				task.timeout = null;
+			}
+
+			this.TaskManager._runTask(task);
+		}));
+	}
+
 
 	/**
 	 * Loads the configuration file
