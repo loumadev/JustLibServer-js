@@ -546,6 +546,12 @@ class Server extends EventListenerStatic {
 	 */
 	static isStopping = false;
 
+	/**
+	 * Date indicating when the server was started
+	 * @type {Date}
+	 */
+	static startDateTime = new Date();
+
 	/** @type {string} */
 	static __dirname = __dirname;
 
@@ -1080,6 +1086,16 @@ class Server extends EventListenerStatic {
 
 		this.stdio.cli.registerCommand(new Command("clear", [], e => {
 			console.clear();
+		}));
+
+		this.stdio.cli.registerCommand(new Command("uptime", [], e => {
+			const duration = getFormattedTime(Date.now() - this.startDateTime.getTime(), {
+				detailed: true,
+				short: true
+			});
+			const date = this.startDateTime.toISOString().replace("T", " ").slice(0, 19);
+
+			this.log(`Server uptime: ${duration} (${date})`);
 		}));
 
 		this.stdio.cli.registerCommand(new Command("ban", [
