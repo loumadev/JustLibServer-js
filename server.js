@@ -2323,7 +2323,14 @@ class RequestEvent extends EventListener.Event {
 			responseStatus: status,
 			responseHeaders: responseHeaders
 		}, event => {
-			this.res.writeHead(event.responseStatus, event.responseHeaders);
+			if(this.res.writableEnded) {
+				this._logWriteAfterEndWarning(new Error(), "Maybe forgot to call 'e.preventDefault()' in the 'beforesend' event handler after sending a response?");
+				return;
+			}
+
+			try {
+				this.res.writeHead(event.responseStatus, event.responseHeaders);
+			} catch(err) { }
 
 			if(isStream) {
 				event.responseData.pipe(this.res);
