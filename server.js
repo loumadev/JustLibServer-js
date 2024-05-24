@@ -7,7 +7,7 @@ const util = require("util");
 const inspector = require("inspector");
 const vm = require("vm");
 const fs = require("fs");
-const {EventListenerStatic, EventListener, fixDigits, iterate, objectDeepMerge, JLListener, JLEvent, getFormattedTime} = require("./JustLib.js");
+const {EventListenerStatic, EventListener, fixDigits, iterate, getQueryParameters, objectDeepMerge, timeout, JLListener, JLEvent, getFormattedTime} = require("./JustLib.js");
 const {CLI, KEY} = require("./CLI");
 const {Command, Variable, Optional, Keyword} = require("./command.js");
 
@@ -800,7 +800,7 @@ class Server extends EventListenerStatic {
 		const protocol = req.headers["x-forwarded-proto"] || "http";
 		const host = req.headers["host"];
 		const ip = proxyIp || remoteIp;
-		const origin = `${protocol}:// ${req.headers.host}`;
+		const origin = `${protocol}://${req.headers.host}`;
 		const isTrusted = this.TRUSTED_IPS.some(e => ip.includes(e));
 		const isBlacklisted = this.BLACKLIST.some(e => ip.includes(e));
 
@@ -1232,7 +1232,7 @@ class Server extends EventListenerStatic {
 				const {scheduledAt, runAt, options} = task;
 				const name = options.name;
 				const delay = options.delay || 0;
-				const status = `${task.isRunning ? `§aRunning (${this.formatDuration(now - runAt)})§r` : `§6Waiting (${this.formatDuration(runAt - now)})`}§r`;
+				const status = `${task.isRunning ? `§aRunning (${this.formatDuration(now - runAt)})` : `§6Waiting (${this.formatDuration(runAt - now)})`}§r`;
 				const repeating = /*options.repeating*/ false ? "Yes" : "No";
 
 				return [
@@ -1246,7 +1246,7 @@ class Server extends EventListenerStatic {
 			});
 
 			const max = rows.reduce((max, row) => {
-				return row.map((cell, i) => Math.max(max[i], Server._unescape(cell).length));
+				return row.map((cell, i) => Math.max(max[i], cell.length));
 			}, header.map(() => 0));
 
 			const table = [header, ...rows].map((row, i) => {
@@ -1882,7 +1882,7 @@ class RequestEvent extends EventListener.Event {
 	/**
 	 * Request origin
 	 * @type {string}
-	 * @example "https:// www.example.com"
+	 * @example "https://www.example.com"
 	 */
 	origin;
 
@@ -2198,7 +2198,7 @@ class RequestEvent extends EventListener.Event {
 	/**
 	 * Redirects destination path to another local path
 	 * @example Server.on("/instagram", e => {
-	 * e.redirectURL("https:// www.instagram.com/example");
+	 * e.redirectURL("https://www.instagram.com/example");
 	 * });
 	 * @example Server.on("/dashboard", e => {
 	 * e.redirectURL("/login");  // This will get converted to absolute path internally
