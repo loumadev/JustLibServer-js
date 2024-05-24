@@ -884,6 +884,7 @@ class Server extends EventListenerStatic {
 			if(EventObject.defaultPrevented) return;
 
 			//Dynamic destination path search
+			const searchDispatched = new Set();
 			const listenerPromises = [];
 
 			//Listener uses dynamic representation of destination path
@@ -892,6 +893,9 @@ class Server extends EventListenerStatic {
 
 				// Event propagation was stopped
 				if(EventObject.isStopped) break;
+
+				// Event was already dispatched
+				if(searchDispatched.has(type)) continue;
 
 				// Try to match the destination path with the regex
 				const match = destinationPath.match(regex);
@@ -906,6 +910,9 @@ class Server extends EventListenerStatic {
 				if(match.groups) {
 					Object.assign(EventObject.matches, match.groups);
 				}
+
+				// Dispatch matched event
+				searchDispatched.add(type);
 
 				// Call the listener manually to prevent unnecessary overhead
 				EventObject.type = type;
