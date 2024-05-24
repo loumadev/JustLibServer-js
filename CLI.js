@@ -1,4 +1,4 @@
-//@ts-check
+// @ts-check
 
 const {EventListener, JLEvent, JLListener} = require("./JustLib.js");
 // const {EventListener} = require("../justlib/JustLib.js");
@@ -332,7 +332,7 @@ class CLI extends EventListener {
 					if(!_enum) return null;
 
 					const value = _enum
-						//.sort((a, b) => a.length - b.length)
+						// .sort((a, b) => a.length - b.length)
 						.find(e => e.startsWith(node.raw));
 					if(!value) return null;
 
@@ -797,7 +797,7 @@ class CLI extends EventListener {
 		const hint = this.hint ? `\n${ERASE_LINE}${this.formatter(this.hint)}${UP}` : this.hasHint && !(this.hasHint = false) ? `\n${ERASE_LINE}${UP}` : "";
 
 		const CLEAR_PROMPT_LINES = this.promptLines == 29 ? `${UP}${ERASE_LINE}\n${UP}\n${DOWN}` : "";
-		//`${UP}${START}${ERASE_LINE}`.repeat(this.promptLines - 1); //+ `${DOWN}`;//.repeat(this.promptLines - 1);
+		// `${UP}${START}${ERASE_LINE}`.repeat(this.promptLines - 1); // + `${DOWN}`;// .repeat(this.promptLines - 1);
 
 		const output = `${START}${ERASE_LINE}${CLEAR_PROMPT_LINES}${this.prompt}${this.buffer}${autocomplete}${START}${hint}${OFFSET_CURSOR}`;
 

@@ -1,4 +1,4 @@
-//@ts-check
+// @ts-check
 
 const {EventListener, JLEvent, JLListener} = require("./JustLib.js");
 

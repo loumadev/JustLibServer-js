@@ -1,4 +1,4 @@
-//@ts-check
+// @ts-check
 
 const formidable = require("formidable");
 const http = require("http");
@@ -30,7 +30,7 @@ const PATH = {
  * @typedef {false | Nullish} Falsy
  */
 
-//TODO: Replace status numbers with `Server.STATUS` enum
+// TODO: Replace status numbers with `Server.STATUS` enum
 
 class Server extends EventListenerStatic {
 	/**
@@ -590,13 +590,13 @@ class Server extends EventListenerStatic {
 	 * @memberof Server
 	 */
 	static async begin() {
-		//Set up logger
+		// Set up logger
 		const filename = this.getFileNameFromDate(new Date());
 		const filepath = path.join(PATH.LOGS, `${filename}.log`);
 		if(!fs.existsSync(PATH.LOGS)) fs.mkdirSync(PATH.LOGS);
 		this.loggerStream = fs.createWriteStream(filepath, {flags: "a"});
 
-		//Set up error logging
+		// Set up error logging
 		process.on("unhandledRejection", (reason, promise) => {
 			this.error("Unhandled Promise Rejection at:", promise);
 		});
@@ -610,7 +610,7 @@ class Server extends EventListenerStatic {
 		const startDate = new Date();
 		this.log("§7Starting initialization...");
 
-		//Config
+		// Config
 		this.log("§7Loading properties...");
 		this._loadConfig();
 		this._loadTrustedIPs();
@@ -622,7 +622,7 @@ class Server extends EventListenerStatic {
 			this.log("§eLogging is disabled!");
 		}
 
-		//CLI
+		// CLI
 		if(this.config["enable-cli"]) {
 			this.log("§7Enabling CLI...");
 			this.stdio.cli = new CLI(
@@ -639,7 +639,7 @@ class Server extends EventListenerStatic {
 			// Register the available commands
 			this._registerCommands();
 
-			//Unknown command handler
+			// Unknown command handler
 			this.stdio.cli.on("unknownCommand", e => {
 				if(e.defaultPrevented) return;
 				e.preventDefault();
@@ -663,14 +663,14 @@ class Server extends EventListenerStatic {
 
 			this.log("§7CLI enabled");
 
-			//SSH Server
+			// SSH Server
 			if(this.config["ssh"]["enabled"]) {
-				//Try to load optional SSH module
+				// Try to load optional SSH module
 				try {
 					this.log("§7Loading SSH module...");
 					var {SSHServer} = (this.__CommonJS_cache["ssh.js"] = require("./ssh"));
 
-					//If module loaded, create new SSH server
+					// If module loaded, create new SSH server
 					this.log("§7Enabling SSH server...");
 					this.ssh = new SSHServer({
 						localCLI: this.stdio.cli,
@@ -689,18 +689,18 @@ class Server extends EventListenerStatic {
 			}
 		} else this.log(`§7CLI disabled`);
 
-		//Init
+		// Init
 		if(!this.title) this.setTitle();
 
-		//Create HTTP server
+		// Create HTTP server
 		if(this.config["enable-http-server"]) {
-			//Create a new empty public folder for serving static files
+			// Create a new empty public folder for serving static files
 			if(!fs.existsSync(PATH.PUBLIC)) {
 				this.log(`§7Creating new empty §fpublic §7folder...`);
 				fs.mkdirSync(PATH.PUBLIC);
 			}
 
-			//Create HTTP server instance and and add all listeners
+			// Create HTTP server instance and and add all listeners
 			this.log("§7Creating HTTP server...");
 			this.http = http.createServer();
 			this.http.on("request", this._handleRequest.bind(this));
@@ -721,15 +721,15 @@ class Server extends EventListenerStatic {
 		// Add event listener for wildcard characters
 		Server._registerAddListenerHandler();
 
-		//Modules
+		// Modules
 		this._loadModules();
 
-		//Load event
+		// Load event
 		this.log("§7Loading server...");
 		await this.dispatchEvent("load", {async: true});
 		this.log("§7Server loaded");
 
-		//Make HTTP server listen for incoming requests
+		// Make HTTP server listen for incoming requests
 		if(this.config["enable-http-server"]) {
 			await new Promise(resolve => {
 				this.http.on("listening", resolve);
@@ -738,7 +738,7 @@ class Server extends EventListenerStatic {
 			});
 		}
 
-		//Print startup duration
+		// Print startup duration
 		this.log(`§7Initialization done (§ftook ${new Date().getTime() - startDate.getTime()}ms§7)`);
 	}
 
@@ -787,7 +787,7 @@ class Server extends EventListenerStatic {
 	static _handleRequest(req, res, redirectTo = undefined, prevEvent = undefined) {
 		if(redirectTo && !prevEvent) throw new TypeError("Cannot redirect request if there is no RequestEvent provided");
 
-		//Handle invalid requests
+		// Handle invalid requests
 		if(!req.url) {
 			res.writeHead(400);
 			res.end("400 Bad Request");
@@ -800,7 +800,7 @@ class Server extends EventListenerStatic {
 		const protocol = req.headers["x-forwarded-proto"] || "http";
 		const host = req.headers["host"];
 		const ip = proxyIp || remoteIp;
-		const origin = `${protocol}://${req.headers.host}`;
+		const origin = `${protocol}:// ${req.headers.host}`;
 		const isTrusted = this.TRUSTED_IPS.some(e => ip.includes(e));
 		const isBlacklisted = this.BLACKLIST.some(e => ip.includes(e));
 
@@ -813,7 +813,7 @@ class Server extends EventListenerStatic {
 			return this._connectionLog(400);
 		}
 
-		//Request handling
+		// Request handling
 		let destinationPath = decodeURIComponent(redirectTo || url.pathname);
 		const resolvedPath = this.resolvePublicResource(destinationPath);
 
@@ -858,7 +858,7 @@ class Server extends EventListenerStatic {
 			}
 		}
 
-		//Updated properties from previous request event
+		// Updated properties from previous request event
 		if(redirectTo) {
 			EventObject.redirectChain.push(destinationPath);
 			EventObject.isRedirected = true;
@@ -867,31 +867,31 @@ class Server extends EventListenerStatic {
 			EventObject.resolvedPath = resolvedPath;
 			EventObject.resolvedFile = resolvedPath;
 
-			//Reset `Event`'s internal properties
+			// Reset `Event`'s internal properties
 			EventObject.isStopped = false;
 			EventObject.hasListener = false;
 			EventObject.defaultPrevented = false;
 		}
 
-		//Fix destination path ending with "/"
+		// Fix destination path ending with "/"
 		if(destinationPath.length > 1 && destinationPath.endsWith("/")) destinationPath = destinationPath.slice(0, -1);
-		//if(destinationPath.length > 1 && destinationPath.endsWith("/")) EventObject.redirectURL(destinationPath.slice(0, -1), this.STATUS.REDIRECT.MOVED_PERMANENTLY);
+		// if(destinationPath.length > 1 && destinationPath.endsWith("/")) EventObject.redirectURL(destinationPath.slice(0, -1), this.STATUS.REDIRECT.MOVED_PERMANENTLY);
 
-		//Dispatch events
+		// Dispatch events
 		(async () => {
-			//Dispatch "request" event
+			// Dispatch "request" event
 			await this.dispatchEvent("request", EventObject);
 			if(EventObject.defaultPrevented) return;
 
-			//Dispatch path event
+			// Dispatch path event
 			await this.dispatchEvent(destinationPath, EventObject);
 			if(EventObject.defaultPrevented) return;
 
-			//Dynamic destination path search
+			// Dynamic destination path search
 			const searchDispatched = new Set();
 			const listenerPromises = [];
 
-			//Listener uses dynamic representation of destination path
+			// Listener uses dynamic representation of destination path
 			for(const {regex, listener} of this._listenersRegexCache) {
 				const type = listener.type;
 
@@ -923,7 +923,7 @@ class Server extends EventListenerStatic {
 				listenerPromises.push(listener.callback(EventObject));
 			}
 
-			//Wait for all listeners to finish
+			// Wait for all listeners to finish
 			await Promise.all(listenerPromises);
 		})().then(() => {
 			// All listeners were processed
@@ -983,17 +983,17 @@ class Server extends EventListenerStatic {
 	 * @memberof Server
 	 */
 	static resolveResource(baseDirectory, filePath) {
-		//Normalize the input parameters
+		// Normalize the input parameters
 		const base = path.normalize(baseDirectory);
 		const resource = path.normalize(filePath);
 
-		//Poision null bytes prevention
+		// Poision null bytes prevention
 		if(resource.indexOf("\0") !== -1) return null;
 
-		//Resolve file path
+		// Resolve file path
 		const resolved = path.resolve(path.join(base, resource));
 
-		//Directory traversal prevention
+		// Directory traversal prevention
 		if(!resolved.startsWith(path.normalize(base))) return null;
 
 		return resolved;
@@ -1353,25 +1353,25 @@ class Server extends EventListenerStatic {
 		this.log("§7Loading configuration...");
 		const name = path.basename(PATH.CONFIG);
 
-		//Create default
+		// Create default
 		if(!fs.existsSync(PATH.CONFIG)) {
 			this.log(`§7Creating default §f${name} §7file...`);
 			fs.writeFileSync(PATH.CONFIG, JSON.stringify(DEFAULT_CONFIG, null, "\t"));
 		}
 
-		//Get current config
+		// Get current config
 		const config = JSON.parse(fs.readFileSync(PATH.CONFIG).toString());
 
-		//Add missing/new properties from default configuration
+		// Add missing/new properties from default configuration
 		const merged = objectDeepMerge(DEFAULT_CONFIG, config, false);
 
-		//Update config
+		// Update config
 		if(JSON.stringify(config) !== JSON.stringify(merged)) {
 			fs.writeFileSync(PATH.CONFIG, JSON.stringify(merged, null, "\t"));
 			this.log(`§7Updated §f${name} §7with latest/missing properties`);
 		}
 
-		//Apply config
+		// Apply config
 		this.config = merged;
 
 		this.log("§7Configuration loaded");
@@ -1408,10 +1408,10 @@ class Server extends EventListenerStatic {
 			const project = basename == dirname ? null : basename;
 			const moduleName = (project ? `${project}/` : "") + filename;
 
-			//Skip files prefixed with '-'
+			// Skip files prefixed with '-'
 			if(filename.startsWith("-")) continue;
 
-			//Skip not '*.js' files
+			// Skip not '*.js' files
 			if(!file.endsWith(".js") || fs.lstatSync(file).isDirectory()) continue;
 
 			// Create a module object
@@ -1425,7 +1425,7 @@ class Server extends EventListenerStatic {
 			};
 			this.modules[moduleName] = _module;
 
-			//Execute file
+			// Execute file
 			try {
 				// Load the module
 				const start = Date.now();
@@ -1462,13 +1462,13 @@ class Server extends EventListenerStatic {
 		this.log("§7Loading trusted IPs...");
 		const name = path.basename(PATH.TRUSTED_IPS);
 
-		//Create default
+		// Create default
 		if(!fs.existsSync(PATH.TRUSTED_IPS)) {
 			this.log(`§7Creating new blank §f${name} §7file...`);
 			fs.writeFileSync(PATH.TRUSTED_IPS, JSON.stringify(["localhost", "127.0.0.1", "::1"]));
 		}
 
-		//Apply Trusted IPs
+		// Apply Trusted IPs
 		this.TRUSTED_IPS = JSON.parse(fs.readFileSync(PATH.TRUSTED_IPS).toString());
 
 		this.log(`§7Loaded §f${this.TRUSTED_IPS.length} §7trusted IPs`);
@@ -1484,13 +1484,13 @@ class Server extends EventListenerStatic {
 		this.log("§7Loading blacklist...");
 		const name = path.basename(PATH.BLACKLIST);
 
-		//Create default
+		// Create default
 		if(!fs.existsSync(PATH.BLACKLIST)) {
 			this.log(`§7Creating new blank §f${name} §7file...`);
 			fs.writeFileSync(PATH.BLACKLIST, JSON.stringify([]));
 		}
 
-		//Apply Blacklist
+		// Apply Blacklist
 		this.BLACKLIST = JSON.parse(fs.readFileSync(PATH.BLACKLIST).toString());
 
 		this.log(`§7Loaded §f${this.BLACKLIST.length} §7blacklisted IPs`);
@@ -1506,13 +1506,13 @@ class Server extends EventListenerStatic {
 		this.log("§7Saving blacklist...");
 		const name = path.basename(PATH.BLACKLIST);
 
-		//Create default
+		// Create default
 		if(!fs.existsSync(PATH.BLACKLIST)) {
 			this.log(`§7Creating new blank §f${name} §7file...`);
 			fs.writeFileSync(PATH.BLACKLIST, JSON.stringify([]));
 		}
 
-		//Save blacklist
+		// Save blacklist
 		fs.writeFileSync(PATH.BLACKLIST, JSON.stringify(this.BLACKLIST));
 
 		this.log(`§7Saved §f${this.BLACKLIST.length} §7blacklisted IPs`);
@@ -1687,7 +1687,7 @@ class Server extends EventListenerStatic {
 		return string.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, "");
 	}
 
-	//Cache to store loaded optional CommonJS modules
+	// Cache to store loaded optional CommonJS modules
 	static __CommonJS_cache = {};
 }
 
@@ -1882,7 +1882,7 @@ class RequestEvent extends EventListener.Event {
 	/**
 	 * Request origin
 	 * @type {string}
-	 * @example "https://www.example.com"
+	 * @example "https:// www.example.com"
 	 */
 	origin;
 
@@ -2055,7 +2055,7 @@ class RequestEvent extends EventListener.Event {
 	constructor(data) {
 		super(data);
 
-		//To make RequestEvent extend both EventListener.Event and EventListener
+		// To make RequestEvent extend both EventListener.Event and EventListener
 		const listener = new EventListener();
 		Object.assign(this, listener);
 		// @ts-ignore
@@ -2066,7 +2066,7 @@ class RequestEvent extends EventListener.Event {
 			this[key] = data[key];
 		}
 
-		//Properties to modify event distribution
+		// Properties to modify event distribution
 		this.async = true;
 		this.parallel = true;
 	}
@@ -2076,7 +2076,7 @@ class RequestEvent extends EventListener.Event {
 	 * @private
 	 */
 	__get(middlewares, callback) {
-		//Middlewares
+		// Middlewares
 		if(!callback && typeof middlewares === "function") { // f(callback)
 			callback = middlewares;
 			middlewares = [];
@@ -2096,7 +2096,7 @@ class RequestEvent extends EventListener.Event {
 			};
 		};
 
-		//Request handling
+		// Request handling
 		if(this.req.method == "GET") {
 			if(this.autoPrevent) this.defaultPrevented = true;
 
@@ -2111,7 +2111,7 @@ class RequestEvent extends EventListener.Event {
 	 * @private
 	 */
 	__post(middlewares, callback, type) {
-		//Middlewares
+		// Middlewares
 		if(typeof middlewares === "function") {
 			if(typeof callback === "function") { // f(middleware, callback[, type])
 				middlewares = [middlewares];
@@ -2136,7 +2136,7 @@ class RequestEvent extends EventListener.Event {
 			};
 		};
 
-		//Type checking
+		// Type checking
 		const contentType = this.headers["content-type"] || "";
 
 		if(contentType.indexOf("application/json") != -1) this.receivedPostType = "json";
@@ -2150,7 +2150,7 @@ class RequestEvent extends EventListener.Event {
 
 		middlewares.push(Server.POST_BODY_HANDLER);
 
-		//Request Handling
+		// Request Handling
 		if(this.req.method == "POST") {
 			executor(middlewares)();
 
@@ -2175,7 +2175,7 @@ class RequestEvent extends EventListener.Event {
 
 	}
 
-	//TODO: Add more methods
+	// TODO: Add more methods
 
 	/**
 	 * Redirects destination path to another local path
@@ -2185,7 +2185,7 @@ class RequestEvent extends EventListener.Event {
 	 * @param {string} destination
 	 * @memberof RequestEvent
 	 */
-	//TODO: Rename to `redirectRequest`
+	// TODO: Rename to `redirectRequest`
 	redirect(destination) {
 		if(typeof destination !== "string") throw new TypeError("'destination' parameter is not type of string");
 
@@ -2198,16 +2198,16 @@ class RequestEvent extends EventListener.Event {
 	/**
 	 * Redirects destination path to another local path
 	 * @example Server.on("/instagram", e => {
-	 * e.redirectURL("https://www.instagram.com/example");
+	 * e.redirectURL("https:// www.instagram.com/example");
 	 * });
 	 * @example Server.on("/dashboard", e => {
-	 * e.redirectURL("/login");  //This will get converted to absolute path internally
+	 * e.redirectURL("/login");  // This will get converted to absolute path internally
 	 * });
 	 * @param {string} destination
 	 * @param {number} [status=307]
 	 * @memberof RequestEvent
 	 */
-	//TODO: Rename to `redirect`
+	// TODO: Rename to `redirect`
 	redirectURL(destination, status = 307) {
 		if(typeof destination !== "string") throw new TypeError("'destination' parameter is not type of string");
 
@@ -2237,10 +2237,10 @@ class RequestEvent extends EventListener.Event {
 		const shouldUseToken = "token" in credentials;
 		const shouldUseCreds = "username" in credentials && "password" in credentials;
 
-		//Handle callback type
+		// Handle callback type
 		if(hasCallback && typeof callback !== "function") throw new TypeError(`Callback '${callback}' is not type of function or null`);
 
-		//No auth header
+		// No auth header
 		if(!auth && (!basic || !bearer)) {
 			if(forceLogin) this.send("", 401, "text/html", {
 				"www-authenticate": shouldUseToken ? `Bearer realm="${realm}"` : `Basic realm="${realm}"`
@@ -2248,9 +2248,9 @@ class RequestEvent extends EventListener.Event {
 			return false;
 		}
 
-		//Bearer auth
+		// Bearer auth
 		if(shouldUseToken) {
-			//Check access
+			// Check access
 			if(bearer !== credentials.token) {
 				if(forceLogin) this.send("401 Unauthorized: Invalid token", 401);
 				Server.log(`§eInvalid token attempt '${bearer}'!`);
@@ -2262,9 +2262,9 @@ class RequestEvent extends EventListener.Event {
 			return true;
 		}
 
-		//Basic auth
+		// Basic auth
 		if(shouldUseCreds) {
-			//Decode credentials
+			// Decode credentials
 			try {
 				var [username, password] = atob(basic).split(":");
 			} catch(err) {
@@ -2274,7 +2274,7 @@ class RequestEvent extends EventListener.Event {
 				return false;
 			}
 
-			//Check access
+			// Check access
 			if(username !== credentials.username || password !== credentials.password) {
 				if(forceLogin) this.send("401 Unauthorized: Invalid credentials", 401);
 				Server.log(`§eUnsuccessful login attempt '${username}:${password}'!`);
@@ -2286,7 +2286,7 @@ class RequestEvent extends EventListener.Event {
 			return true;
 		}
 
-		//Unsupported auth
+		// Unsupported auth
 		this.send("500 Internal Server Error: Cannot process provided authentication type", 500);
 		throw new TypeError("Invalid credentials / unsupported authentication type" + JSON.stringify({credentials, auth}));
 	}
@@ -2307,7 +2307,7 @@ class RequestEvent extends EventListener.Event {
 			return;
 		}
 
-		//Send data
+		// Send data
 		const isObject = typeof data === "object";
 		const isBuffer = data instanceof Buffer;
 		// @ts-ignore
@@ -2389,7 +2389,7 @@ class RequestEvent extends EventListener.Event {
 
 		headers["Content-Length"] = stat.size;
 
-		//Send file
+		// Send file
 		this.send(fs.createReadStream(filePath), status, getContentType(filePath), headers);
 		return true;
 	}
@@ -2424,19 +2424,19 @@ class RequestEvent extends EventListener.Event {
 			return true;
 		}
 
-		//Request cannot be fulfilled due to incorrect range
+		// Request cannot be fulfilled due to incorrect range
 		if(range.start >= stat.size || range.end >= stat.size) {
-			//Send correct range
+			// Send correct range
 			_headers["Content-Range"] = `bytes */${stat.size}`;
 			this.send("416 Range Not Satisfiable", 416, contentType, _headers);
 		} else {
-			//Set up headers
+			// Set up headers
 			_headers["Content-Range"] = `bytes ${range.start}-${range.end}/${stat.size}`;
 			_headers["Content-Length"] = range.start == range.end ? 0 : (range.end - range.start + 1);
 			_headers["Accept-Ranges"] = "bytes";
-			//headers["Cache-Control"] = "no-cache";
+			// headers["Cache-Control"] = "no-cache";
 
-			//Send part of file
+			// Send part of file
 			this.send(fs.createReadStream(filePath, range), 206, contentType, _headers);
 		}
 		return true;
@@ -2555,7 +2555,7 @@ class CookieJar {
 		this.cookies = [];
 
 		this.setCookie = (...args) => {
-			//Set by name=value
+			// Set by name=value
 			{
 				const [name, value, options = {}] = /**@type {[string, string, CookieProperties]}*/(args);
 
@@ -2569,7 +2569,7 @@ class CookieJar {
 				}
 			}
 
-			//Set by array of cookie strings
+			// Set by array of cookie strings
 			{
 				const [cookieStrings] = /**@type {[string[]]}*/(args);
 
@@ -2581,7 +2581,7 @@ class CookieJar {
 				}
 			}
 
-			//Set by Cookie object
+			// Set by Cookie object
 			{
 				const [cookie] = /**@type {[CookieJar.Cookie]}*/(args);
 
@@ -2591,7 +2591,7 @@ class CookieJar {
 				}
 			}
 
-			//Set by Cookie array
+			// Set by Cookie array
 			{
 				const [cookies] = /**@type {[CookieJar.Cookie[]]}*/(args);
 
@@ -2601,7 +2601,7 @@ class CookieJar {
 				}
 			}
 
-			//Set by Request object
+			// Set by Request object
 			{
 				const [request] = /**@type {[http.IncomingMessage]}*/(args);
 
@@ -2616,7 +2616,7 @@ class CookieJar {
 				}
 			}
 
-			//Set by Response object (http)
+			// Set by Response object (http)
 			{
 				const [response] = /**@type {[http.ServerResponse]}*/(args);
 
@@ -2632,7 +2632,7 @@ class CookieJar {
 				}
 			}
 
-			//Set by Response object (fetch)
+			// Set by Response object (fetch)
 			{
 				const [response] = /**@type {[FetchLikeResponse]}*/(args);
 
@@ -2656,7 +2656,7 @@ class CookieJar {
 				}
 			}
 
-			//Set by JSON object
+			// Set by JSON object
 			{
 				const [jsonObject] = /**@type {[CookieJar]}*/(args);
 
@@ -2879,7 +2879,7 @@ CookieJar.Cookie = class Cookie {
 				} else if(flag) {
 					cookie.props[this.formatKeyword(flag) || flag] = true;
 				} else {
-					//throw new TypeError("Failed to parse cookie: '" + property + "'");
+					// throw new TypeError("Failed to parse cookie: '" + property + "'");
 					Server.warn(`Failed to parse cookie: '${property}'`);
 				}
 			}
@@ -2907,151 +2907,151 @@ const DEFAULT_CONFIG = {
 
 const DEFAULT_MAIN = `const {Server, CookieJar} = require("../server.js");
 
-//Handle load event
+// Handle load event
 Server.on("load", e => {
 	Server.log("§aThis is my colored message!");
 
-	//Using server CLI
+	// Using server CLI
 	Server.stdio.cli.on("command", cmd => {
-		//'input' is whole input
-		//'command' is issued command
-		//'args' is array of command arguments
+		// 'input' is whole input
+		// 'command' is issued command
+		// 'args' is array of command arguments
 		const {input, command, args} = cmd;
 
-		//'say' command
+		// 'say' command
 		if(command == "say") {
 			Server.log("You just said: " + input);
 		}
-		//'info' command
+		// 'info' command
 		else if(command == "info") {
 			Server.log("You issued", command, "command with", args.length, "arguments, all together as:", input);
 		}
-		//This is not our command, just ignore it
+		// This is not our command, just ignore it
 		else return;
 
-		//Remember to always prevent default action of the event,
-		//otherwise 'unknownCommand' event will be fired!
+		// Remember to always prevent default action of the event,
+		// otherwise 'unknownCommand' event will be fired!
 		e.preventDefault();
 	});
 });
 
-//Root handler
+// Root handler
 Server.on("/", e => {
 	e.send("Hello World, from the server!");
 });
 
-//Handle simple request
+// Handle simple request
 Server.on("/hello", e => {
 	e.send("Hey!");
 });
 
-//Handle 404 Not Found
+// Handle 404 Not Found
 Server.on("404", e => {
 	e.send("There's nothing you see here :(");
 });
 
-//Handle 500 Internal Server Error
+// Handle 500 Internal Server Error
 Server.on("500", e => {
 	e.send("Something went wrong :/");
 });
 
-//Handle dynamic request
-//There are two special characters available:
-//'*' - extends to /(.*)/ regex (matches 0 or more characters)
-//'?' - extends to /(.)/ regex (matches 1 character)
-//':' - extends to /([^/]+?)/ regex (matches 1 or more characters, until '/')
-//Example: let's say we want format like this: '/user/<user>/<page>' => '/user/john123/profile'
+// Handle dynamic request
+// There are two special characters available:
+// '*' - extends to /(.*)/ regex (matches 0 or more characters)
+// '?' - extends to /(.)/ regex (matches 1 character)
+// ':' - extends to /([^/]+?)/ regex (matches 1 or more characters, until '/')
+// Example: let's say we want format like this: '/user/<user>/<page>' => '/user/john123/profile'
 Server.on("/user/:user/:page", e => {
-	//e.matches contains ordered matches from requested url
-	//get 'user' and 'page' from matched url
+	// e.matches contains ordered matches from requested url
+	// get 'user' and 'page' from matched url
 	const {user, page} = e.matches;
 
 	if(page == "profile") {
-		//Send user their profile page
+		// Send user their profile page
 		e.send("Welcome back " + user);
 	} else if(page == "settings") {
-		//do more stuff...
+		// do more stuff...
 	}
 
-	//If no response was sent, the 404 status will be sent
+	// If no response was sent, the 404 status will be sent
 });
 
-//Example: '/file/<username>/<path_to_file>' => '/file/john123/path/to/my/file.txt'
+// Example: '/file/<username>/<path_to_file>' => '/file/john123/path/to/my/file.txt'
 Server.on("/user/:user/*", e => {
 	const [username, path] = e.matches;
-	//or const {username, matches: [, path]} = e.matches;
+	// or const {username, matches: [, path]} = e.matches;
 
-	//Query the database to obtain user id
+	// Query the database to obtain user id
 	const user_id = "213465879";
 
-	//Serve file from fs
+	// Serve file from fs
 	e.streamFile("/user_content/" + user_id + "/" + path);
 });
 
-//Redirect request to another path
+// Redirect request to another path
 Server.on("/home", e => {
-	//Since there is no "/home.html" handler this will
-	//respond with file "/public/home.html" (if it exists)
+	// Since there is no "/home.html" handler this will
+	// respond with file "/public/home.html" (if it exists)
 	e.redirect("/home.html");
 });
 
-//Handle different request methods
+// Handle different request methods
 Server.on("/request", e => {
-	//Handle GET method
+	// Handle GET method
 	e.get(query => {
 		e.send("GET: Your sent query string: " + JSON.stringify(query));
 	});
 
-	//Handle POST method
+	// Handle POST method
 	e.post(body => {
 		e.send("POST: Your sent data: " + body);
 	});
 
-	//POST requests may have defined (second parameter of the post function) body data type (json or form),
-	//those will get parsed into JSON object.
-	//Second parameter of the callback is body buffer
+	// POST requests may have defined (second parameter of the post function) body data type (json or form),
+	// those will get parsed into JSON object.
+	// Second parameter of the callback is body buffer
 	// e.post((body, buffer) => {
 	// 	e.send("POST: Your sent data parsed as JSON: " + JSON.stringify(body));
 	// }, "json");
 });
 
-//Advanced request handling
+// Advanced request handling
 Server.on("/request", e => {
-	//Get values from event object
+	// Get values from event object
 	const {req, res, method} = e;
 
-	//Get cookies from request object
+	// Get cookies from request object
 	const cookies = new CookieJar(req);
 
-	//If there is no 'session' cookie, send error with 401 status code
+	// If there is no 'session' cookie, send error with 401 status code
 	if(!cookies.getCookie("session") && method == "GET")
 		return e.send("Error: You do not have session token yet! Send POST request to get one!", 401);
 
-	//Handle GET method
+	// Handle GET method
 	e.get(query => {
-		//Get value of 'session' cookie
+		// Get value of 'session' cookie
 		const session = cookies.getCookie("session").value;
 
-		//Check database if the session token is valid
+		// Check database if the session token is valid
 		if(session == "T0yS2KoavK59Xy5y7YXc87nQ") {
-			//Send successful response
+			// Send successful response
 			e.send("GET: Congratulations! You have logged in!");
 		} else {
-			//Send unsuccessful response
+			// Send unsuccessful response
 			e.send("GET: Your session token is invalid! Try to log in!", 401);
 		}
 	});
 
-	//Handle POST method
+	// Handle POST method
 	e.post(body => {
-		//Generate new session token cookie and add it to cookie jar
-		//Note: This will overwrite the original value
+		// Generate new session token cookie and add it to cookie jar
+		// Note: This will overwrite the original value
 		cookies.setCookie("session", "T0yS2KoavK59Xy5y7YXc87nQ");
 
-		//Send updated cookies
+		// Send updated cookies
 		cookies.send(res);
 
-		//Send successful response
+		// Send successful response
 		e.send("POST: Your new session token has been generated! You can log in now!" + body);
 	});
 });`;
@@ -3206,7 +3206,7 @@ Server.POST_BODY_HANDLER = function(event, next) {
 
 	if(event.autoPrevent) event.defaultPrevented = true;
 
-	//Skip body handling if it's already handled
+	// Skip body handling if it's already handled
 	if(event.isBodyReceived) {
 		next();
 		return;
@@ -3226,11 +3226,11 @@ Server.POST_BODY_HANDLER = function(event, next) {
 		const form = new formidable.IncomingForm(event.formidableOptions);
 		const body = {};
 
-		//Handle multipart/form-data request body
+		// Handle multipart/form-data request body
 		form.parse(event.req, err => {
 			if(err) throw err;
 
-			//Create single value properties
+			// Create single value properties
 			for(const key in body) {
 				if(!body.hasOwnProperty(key)) continue;
 
@@ -3238,7 +3238,7 @@ Server.POST_BODY_HANDLER = function(event, next) {
 				field.value = field.array[field.array.length - 1];
 			}
 
-			//Set internal properties
+			// Set internal properties
 			event.body = body;
 			event.bodyRaw = null;
 			event.isBodyReceived = true;
@@ -3251,7 +3251,7 @@ Server.POST_BODY_HANDLER = function(event, next) {
 			event.send("500 Internal Server Error", 500);
 		});
 
-		//Handle multiple files
+		// Handle multiple files
 		form.on("file", (field, file) => {
 			if(!body[field]) body[field] = {
 				array: [],
@@ -3263,7 +3263,7 @@ Server.POST_BODY_HANDLER = function(event, next) {
 			body[field].files.push(file);
 		});
 
-		//Handle multiple fields
+		// Handle multiple fields
 		form.on("field", (field, value) => {
 			if(!body[value]) body[field] = {
 				array: [],
