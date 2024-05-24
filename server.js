@@ -2486,11 +2486,12 @@ class RequestEvent extends EventListener.Event {
 	 *
 	 * @private
 	 * @param {Error} error Error object need to be passed from the faulty place to keep the stack trace clean
+	 * @param {string} hint Message hint to be logged to the console
 	 * @memberof RequestEvent
 	 */
-	_logWriteAfterEndWarning(error) {
+	_logWriteAfterEndWarning(error, hint = "Maybe 'send()', 'sendFile()', 'streamFile()' are being called multiple times or you forgot to call 'preventDefault()'?)") {
 		error.name = "";
-		error.message = "Failed to write response after end. (Maybe 'send()', 'sendFile()', 'streamFile()' are being called multiple times or you forgot to call 'preventDefault()'?)";
+		error.message = `Failed to write response after end.(${hint})`;
 		Server.warn(error);
 	}
 }
