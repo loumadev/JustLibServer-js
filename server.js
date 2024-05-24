@@ -1205,7 +1205,7 @@ class Server extends EventListenerStatic {
 				const {scheduledAt, runAt, options} = task;
 				const name = options.name;
 				const delay = options.delay || 0;
-				const status = `${task.isRunning ? `§aRunning (${this.formatDuration(now - runAt)})` : `§6Waiting (${this.formatDuration(runAt - now)})`}§r`;
+				const status = `${task.isRunning ? `§aRunning (${this.formatDuration(now - runAt)})§r` : `§6Waiting (${this.formatDuration(runAt - now)})`}§r`;
 				const repeating = /*options.repeating*/ false ? "Yes" : "No";
 
 				return [
@@ -1219,7 +1219,7 @@ class Server extends EventListenerStatic {
 			});
 
 			const max = rows.reduce((max, row) => {
-				return row.map((cell, i) => Math.max(max[i], cell.length));
+				return row.map((cell, i) => Math.max(max[i], Server._unescape(cell).length));
 			}, header.map(() => 0));
 
 			const table = [header, ...rows].map((row, i) => {
