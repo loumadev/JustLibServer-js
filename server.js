@@ -7,7 +7,7 @@ const util = require("util");
 const inspector = require("inspector");
 const vm = require("vm");
 const fs = require("fs");
-const {EventListenerStatic, EventListener, fixDigits, iterate, getQueryParameters, objectDeepMerge, timeout, JLListener, JLEvent} = require("./JustLib.js");
+const {EventListenerStatic, EventListener, fixDigits, iterate, objectDeepMerge, JLListener, JLEvent, getFormattedTime} = require("./JustLib.js");
 const {CLI, KEY} = require("./CLI");
 const {Command, Variable, Optional, Keyword} = require("./command.js");
 
