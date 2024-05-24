@@ -491,7 +491,8 @@ class Server extends EventListenerStatic {
 
 				// Set up the cache timeout
 				this._cacheTimout = setTimeout(() => {
-					this.session?.disconnect();
+					this.disconnect();
+					this._cacheTimout = null;
 				}, this.SESSION_CACHE_DURATION_MS);
 			}
 
