@@ -24,7 +24,10 @@ const PATH = {
 };
 
 /**
- * @typedef {Object<string, any>} ObjectLiteral
+ * @typedef {Record<string, any>} ObjectLiteral
+ * @typedef {string | number | ObjectLiteral | any[] | boolean | null | undefined} Literal
+ * @typedef {null | undefined} Nullish
+ * @typedef {false | Nullish} Falsy
  */
 
 //TODO: Replace status numbers with `Server.STATUS` enum
@@ -1725,7 +1728,7 @@ class RequestEvent extends EventListener.Event {
 	 */
 
 	/**
-	 * @typedef {string | number | ObjectLiteral | any[] | boolean | null | undefined} POSTJSONBody 
+	 * @typedef {Literal} POSTJSONBody 
 	 */
 
 	/**
