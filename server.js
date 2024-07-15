@@ -1321,7 +1321,7 @@ class Server extends EventListenerStatic {
 			const regex = new RegExp(
 				"^" // Start of the path
 				+ type
-					.replace(/(\.|\(|\)|\[|\]|\||\{|\}|\+|\^|\$|\/|\-|\\)/g, "\\$1") // Escape special characters
+					.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&") // Escape special characters
 					.replace(/\?/g, "(.)") // Replace "?" with "any character"
 					.replace(/\*/g, "(.*)") // Replace "*" with "any character(s)"
 					.replace(/:(\w*)/g, (match, name) => {
