@@ -1692,108 +1692,81 @@ class Server extends EventListenerStatic {
 }
 
 /**
- *
+ * @typedef {Record<string, unknown>} MiddlewareData
+ */
+
+/**
+ * @template {MiddlewareData} T
+ * @typedef {(event: RequestEvent<T>, next: () => void) => void} Middleware
+ */
+
+/**
+ * @template {MiddlewareData} T
+ * @typedef {(query: RequestQuery, event: RequestEvent<T>) => void} GETLikeRequestCallback
+ */
+
+/**
+ * @typedef {Object} POSTMultipartField
+ * @property {string | formidable.File} value Last received value for this field (including files)
+ * @property {(string | formidable.File)[]} array Array of all values for this field (including files)
+ * @property {formidable.File[]} files Array of all files for this field
+ * @property {string[]} fields Array of all values for this field
+ */
+
+/**
+ * POST request multipart body. Contains all fields and files received.
+ * Property key is the field name.
+ * @typedef {Object<string, POSTMultipartField>} POSTMultipartBody
+ */
+
+/**
+ * @typedef {Literal} POSTJSONBody 
+ */
+
+/**
+ * @typedef {string} POSTTextBody
+ */
+
+/**
+ * @typedef {ObjectLiteral} POSTFormBody
+ */
+
+/**
+ * @typedef {Buffer} POSTRawBody
+ */
+
+/**
+ * @typedef {POSTMultipartBody | POSTJSONBody | POSTTextBody | POSTFormBody | POSTRawBody} POSTBody
+ */
+
+/**
+ * @typedef {"text" | "json" | "json-object" | "json-array" | "form" | "multipart" | "raw"} POSTBodyType 
+ */
+
+/**
+ * @template {MiddlewareData} T
+ * @template {POSTBodyType | undefined} U
+ * @typedef {
+	U extends "text" ? (bodyParsed: POSTTextBody, bodyBuffer: Buffer, event: RequestEvent<T>) => void :
+	U extends "json" ? (bodyParsed: POSTJSONBody, bodyBuffer: Buffer, event: RequestEvent<T>) => void :
+	U extends "json-object" ? (bodyParsed: ObjectLiteral, bodyBuffer: Buffer, event: RequestEvent<T>) => void :
+	U extends "json-array" ? (bodyParsed: Array<any>, bodyBuffer: Buffer, event: RequestEvent<T>) => void :
+	U extends "form" ? (bodyParsed: POSTFormBody, bodyBuffer: Buffer, event: RequestEvent<T>) => void :
+	U extends "multipart" ? (bodyParsed: POSTMultipartBody, bodyBuffer: null, event: RequestEvent<T>) => void :
+	U extends "raw" ? (bodyParsed: POSTRawBody, bodyBuffer: Buffer, event: RequestEvent<T>) => void :
+	(bodyParsed: POSTBody, bodyBuffer: Buffer, event: RequestEvent<T>) => void
+   } POSTLikeRequestCallback
+ */
+
+/**
+ * @template {MiddlewareData} T
  * @class RequestEvent
  * @extends {EventListener.Event}
  */
 class RequestEvent extends EventListener.Event {
 	/**
-	 * @typedef {Object<string, string>} RequestQuery
+	 * @typedef {Record<string, string>} RequestQuery
 	 */
-
-	/**
-	 * @typedef {(event: RequestEvent, next: Function) => void} MiddlewareCallback
-	 */
-
-	/**
-	 * @typedef {(query: RequestQuery) => void} RequestCallbackGET
-	 */
-
-	/**
-	 * @typedef {(query: RequestQuery) => void} RequestCallbackOPTIONS
-	 */
-
-	/**
-	 * @typedef {Object} POSTMultipartField
-	 * @property {string | formidable.File} value Last received value for this field (including files)
-	 * @property {(string | formidable.File)[]} array Array of all values for this field (including files)
-	 * @property {formidable.File[]} files Array of all files for this field
-	 * @property {string[]} fields Array of all values for this field
-	 */
-
-	/**
-	 * POST request multipart body. Contains all fields and files received.
-	 * Property key is the field name.
-	 * @typedef {Object<string, POSTMultipartField>} POSTMultipartBody
-	 */
-
-	/**
-	 * @typedef {Literal} POSTJSONBody 
-	 */
-
-	/**
-	 * @typedef {string} POSTTextBody
-	 */
-
-	/**
-	 * @typedef {ObjectLiteral} POSTFormBody
-	 */
-
-	/**
-	 * @typedef {Buffer} POSTRawBody
-	 */
-
-	/**
-	 * @typedef {POSTMultipartBody | POSTJSONBody | POSTTextBody | POSTFormBody | POSTRawBody} POSTBody
-	 */
-
-	/**
-	 * @typedef {"json" | "json-object" | "json-array" | "form" | "multipart" | "text" | "raw"} POSTBodyType 
-	 */
-
-	/**
-	 * @typedef {
-			((callback: RequestCallbackGET) => boolean) &
-			((middleware: MiddlewareCallback, callback: RequestCallbackGET) => boolean) &
-			((middlewares: MiddlewareCallback[], callback: RequestCallbackGET) => boolean)
-		} RequestHandlerGET
-	 */
-
-	/**
-	 * @typedef {
-			((callback: (bodyParsed: POSTBody, bodyBuffer: Buffer) => void) => boolean) &
-			((callback: (bodyParsed: POSTTextBody, bodyBuffer: Buffer) => void, type: "text") => boolean) &
-			((callback: (bodyParsed: POSTJSONBody, bodyBuffer: Buffer) => void, type: "json") => boolean) &
-			((callback: (bodyParsed: ObjectLiteral, bodyBuffer: Buffer) => void, type: "json-object") => boolean) &
-			((callback: (bodyParsed: Array<any>, bodyBuffer: Buffer) => void, type: "json-array") => boolean) &
-			((callback: (bodyParsed: POSTFormBody, bodyBuffer: Buffer) => void, type: "form") => boolean) &
-			((callback: (bodyParsed: POSTMultipartBody) => void, type: "multipart") => boolean) &
-			((callback: (bodyParsed: POSTRawBody, bodyBuffer: Buffer) => void, type: "raw") => boolean) &
-
-			((middleware: MiddlewareCallback, callback: (bodyParsed: POSTBody, bodyBuffer: Buffer) => void) => boolean) &
-			((middleware: MiddlewareCallback, callback: (bodyParsed: POSTTextBody, bodyBuffer: Buffer) => void, type: "text") => boolean) &
-			((middleware: MiddlewareCallback, callback: (bodyParsed: POSTJSONBody, bodyBuffer: Buffer) => void, type: "json") => boolean) &
-			((middleware: MiddlewareCallback, callback: (bodyParsed: ObjectLiteral, bodyBuffer: Buffer) => void, type: "json-object") => boolean) &
-			((middleware: MiddlewareCallback, callback: (bodyParsed: Array<any>, bodyBuffer: Buffer) => void, type: "json-array") => boolean) &
-			((middleware: MiddlewareCallback, callback: (bodyParsed: POSTFormBody, bodyBuffer: Buffer) => void, type: "form") => boolean) &
-			((middleware: MiddlewareCallback, callback: (bodyParsed: POSTMultipartBody) => void, type: "multipart") => boolean) &
-			((middleware: MiddlewareCallback, callback: (bodyParsed: POSTRawBody, bodyBuffer: Buffer) => void, type: "raw") => boolean) &
-
-			((middleware: MiddlewareCallback[], callback: (bodyParsed: POSTBody, bodyBuffer: Buffer) => void) => boolean) &
-			((middleware: MiddlewareCallback[], callback: (bodyParsed: POSTTextBody, bodyBuffer: Buffer) => void, type: "text") => boolean) &
-			((middleware: MiddlewareCallback[], callback: (bodyParsed: POSTJSONBody, bodyBuffer: Buffer) => void, type: "json") => boolean) &
-			((middleware: MiddlewareCallback[], callback: (bodyParsed: ObjectLiteral, bodyBuffer: Buffer) => void, type: "json-object") => boolean) &
-			((middleware: MiddlewareCallback[], callback: (bodyParsed: Array<any>, bodyBuffer: Buffer) => void, type: "json-array") => boolean) &
-			((middleware: MiddlewareCallback[], callback: (bodyParsed: POSTFormBody, bodyBuffer: Buffer) => void, type: "form") => boolean) &
-			((middleware: MiddlewareCallback[], callback: (bodyParsed: POSTMultipartBody) => void, type: "multipart") => boolean) &
-			((middleware: MiddlewareCallback[], callback: (bodyParsed: POSTRawBody, bodyBuffer: Buffer) => void, type: "raw") => boolean)
-		} RequestHandlerPOST
-	 */
-
-	/**
-	 * @typedef {(callback: RequestCallbackOPTIONS) => boolean} RequestHandlerOPTIONS
-	 */
-
 
 	/**
 	 * @type {
@@ -1976,8 +1949,9 @@ class RequestEvent extends EventListener.Event {
 
 	/**
 	 * Represents custom data object. Could be used in the middlewares to transfer data into event handlers.
-	 * @type {ObjectLiteral}
+	 * @type {MiddlewareData & T}
 	 */
+	// @ts-ignore
 	data = {};
 
 	/**
@@ -2026,28 +2000,6 @@ class RequestEvent extends EventListener.Event {
 	resolvedPostType = "raw";
 
 	/**
-	 * Handles GET requests
-	 * @returns {boolean} True if request was successfully handled, otherwise false
-	 * @type {RequestHandlerGET}
-	*/
-	get = this.__get;
-
-	/**
-	 * Handles POST requests
-	 * @returns {boolean} True if request was successfully handled, otherwise false
-	 * @type {RequestHandlerPOST}
-	*/
-	post = this.__post;
-
-	/**
-	 * Handles OPTIONS requests
-	 * @returns {boolean} True if request was successfully handled, otherwise false
-	 * @type {RequestHandlerOPTIONS}
-	*/
-	options = this.__options;
-
-
-	/**
 	 * Creates an instance of RequestEvent.
 	 * @param {*} data
 	 * @memberof RequestEvent
@@ -2074,6 +2026,22 @@ class RequestEvent extends EventListener.Event {
 	// eslint-disable-next-line valid-jsdoc
 	/**
 	 * @private
+	 * 
+	 * @overload
+	 * @param {GETLikeRequestCallback<{}>} callback
+	 * @returns {boolean} True if request was successfully handled, otherwise false
+	 * 
+	 * @template {MiddlewareData} T1
+	 * @overload
+	 * @param {Middleware<T1>} middleware
+	 * @param {GETLikeRequestCallback<T1>} callback
+	 * @returns {boolean} True if request was successfully handled, otherwise false
+	 * 
+	 * @template {Middleware<any>[]} T2
+	 * @overload
+	 * @param {T2} middlewares
+	 * @param {T2[number] extends Middleware<infer U2> ? GETLikeRequestCallback<U2> : never} callback
+	 * @returns {boolean} True if request was successfully handled, otherwise false
 	 */
 	__get(middlewares, callback) {
 		// Middlewares
@@ -2085,30 +2053,39 @@ class RequestEvent extends EventListener.Event {
 		else if(!callback) throw new TypeError("'callback' parameter is not type of function");
 		else if(!(middlewares instanceof Array)) throw new TypeError("'middlewares' parameter is not type of function[]");
 
-		const executor = (middlewares, i = 0) => {
-			return async () => {
-				try {
-					if(i == middlewares.length) await callback(this.query);
-					else await middlewares[i](this, executor(middlewares, i + 1));
-				} catch(err) {
-					Server._handleInternalError(this, err);
-				}
-			};
-		};
-
 		// Request handling
-		if(this.req.method == "GET") {
-			if(this.autoPrevent) this.defaultPrevented = true;
+		if(this.autoPrevent) this.defaultPrevented = true;
 
-			executor(middlewares)();
+		this.__runMiddlewares(middlewares, () => callback(this.query, this));
 
-			return true;
-		} else return false;
+		return true;
 	}
 
 	// eslint-disable-next-line valid-jsdoc
 	/**
 	 * @private
+	 * 
+	 * @template {POSTBodyType | undefined} [X1=undefined]
+	 * @overload
+	 * @param {POSTLikeRequestCallback<{}, X1>} callback
+	 * @param {X1} [payloadType]
+	 * @returns {boolean} True if request was successfully handled, otherwise false
+	 * 
+	 * @template {MiddlewareData} T1
+	 * @template {POSTBodyType | undefined} [X2=undefined]
+	 * @overload
+	 * @param {Middleware<T1>} middleware
+	 * @param {POSTLikeRequestCallback<T1, X2>} callback
+	 * @param {X2} [payloadType]
+	 * @returns {boolean} True if request was successfully handled, otherwise false
+	 * 
+	 * @template {Middleware<any>[]} T2
+	 * @template {POSTBodyType | undefined} [X3=undefined]
+	 * @overload
+	 * @param {T2} middlewares
+	 * @param {T2[number] extends Middleware<infer U2> ? POSTLikeRequestCallback<U2, X3> : never} callback
+	 * @param {X3} [payloadType]
+	 * @returns {boolean} True if request was successfully handled, otherwise false
 	 */
 	__post(middlewares, callback, type) {
 		// Middlewares
@@ -2125,17 +2102,6 @@ class RequestEvent extends EventListener.Event {
 		if(!middlewares || (middlewares.length && typeof middlewares[0] !== "function")) throw new TypeError("'middlewares' parameter must be either type of function[] or function");
 		if(typeof callback !== "function") throw new TypeError("'callback' parameter must be type of function");
 
-		const executor = (middlewares, i = 0) => {
-			return async () => {
-				try {
-					if(i == middlewares.length) await callback(this.body, this.bodyRaw);
-					else await middlewares[i](this, executor(middlewares, i + 1));
-				} catch(err) {
-					Server._handleInternalError(this, err);
-				}
-			};
-		};
-
 		// Type checking
 		const contentType = this.headers["content-type"] || "";
 
@@ -2151,31 +2117,43 @@ class RequestEvent extends EventListener.Event {
 		middlewares.push(Server.POST_BODY_HANDLER);
 
 		// Request Handling
-		if(this.req.method == "POST") {
-			executor(middlewares)();
+		this.__runMiddlewares(middlewares, () => callback(this.body, this.bodyRaw, this));
 
-			return true;
-		} else return false;
+		return true;
 	}
 
-	__options(callback) {
-		if(typeof callback !== "function") throw new TypeError("'callback' parameter is not type of function");
+	// eslint-disable-next-line valid-jsdoc
+	/**
+	 * @param {Middleware<any>[]} middlewares
+	 * @param {() => void} callback
+	 * @memberof RequestEvent
+	 */
+	__runMiddlewares(middlewares, callback) {
+		const length = middlewares.length;
+		let currentIndex = 0;
 
-		if(this.req.method == "OPTIONS") {
-			if(this.autoPrevent) this.defaultPrevented = true;
+		const runMiddleware = () => {
+			try {
+				if(currentIndex === length) return callback();
 
-			(async () => {
-				await callback(this.query);
-			})().catch(err => {
+				const middleware = middlewares[currentIndex];
+
+				let nextCalled = false;
+				const next = () => {
+					if(nextCalled) return;
+					nextCalled = true;
+					currentIndex++;
+					runMiddleware();
+				};
+
+				middleware(this, next);
+			} catch(err) {
 				Server._handleInternalError(this, err);
-			});
+			}
+		};
 
-			return true;
-		} else return false;
-
+		runMiddleware();
 	}
-
-	// TODO: Add more methods
 
 	/**
 	 * Redirects destination path to another local path
@@ -2505,6 +2483,30 @@ class RequestEvent extends EventListener.Event {
 		Server.warn(error);
 	}
 }
+
+// eslint-disable-next-line valid-jsdoc
+/** @type {RequestEvent["__get"]} */
+RequestEvent.prototype.get = function() {
+	if(this.req.method !== "GET") return false;
+	// @ts-ignore
+	return this.__get.apply(this, arguments);
+};
+
+// eslint-disable-next-line valid-jsdoc
+/** @type {RequestEvent["__get"]} */
+RequestEvent.prototype.options = function() {
+	if(this.req.method !== "OPTIONS") return false;
+	// @ts-ignore
+	return this.__get.apply(this, arguments);
+};
+
+// eslint-disable-next-line valid-jsdoc
+/** @type {RequestEvent["__post"]} */
+RequestEvent.prototype.post = function() {
+	if(this.req.method !== "POST") return false;
+	// @ts-ignore
+	return this.__post.apply(this, arguments);
+};
 
 
 /**
@@ -3199,7 +3201,7 @@ const STATUS = {
 Server.STATUS = STATUS;
 
 // eslint-disable-next-line valid-jsdoc
-/** @type {MiddlewareCallback} */
+/** @type {Middleware<{}>} */
 Server.POST_BODY_HANDLER = function(event, next) {
 	// Ignore if method is not POST
 	if(event.method !== "POST") return;
