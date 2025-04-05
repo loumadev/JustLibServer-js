@@ -2388,7 +2388,7 @@ class RequestEvent extends EventListener.Event {
 		const _headers = (typeof status === "object" ? status : headers) || {};
 
 		const contentType = getContentType(filePath);
-		const stat = await fs.promises.stat(filePath).catch(() => { });
+		const stat = await fs.promises.stat(filePath).catch(() => null);
 		if(!stat || stat.isDirectory()) {
 			Server._handleNotFound(this);
 			return false;
@@ -2415,7 +2415,13 @@ class RequestEvent extends EventListener.Event {
 			// headers["Cache-Control"] = "no-cache";
 
 			// Send part of file
-			this.send(fs.createReadStream(filePath, range), 206, contentType, _headers);
+			try {
+				this.send(fs.createReadStream(filePath, range), 206, contentType, _headers);
+			} catch(err) {
+				// By this time, the file could be already gone
+				Server._handleNotFound(this);
+				return false;
+			}
 		}
 		return true;
 	}
