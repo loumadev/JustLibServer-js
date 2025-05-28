@@ -1,4 +1,4 @@
-// @ts-check
+//@ts-check
 
 const {EventListener, JLEvent, JLListener} = require("./JustLib.js");
 
@@ -7,6 +7,7 @@ const {EventListener, JLEvent, JLListener} = require("./JustLib.js");
  * @prop {GraphNode} node
  * @prop {string} raw
  * @prop {any} value
+ * @prop {string[]} enums
  */
 
 /**
@@ -175,7 +176,7 @@ class GraphGenerator {
 			const arg = argv[index];
 
 			/** @type {MatchedNode} */
-			const currentMatchNode = {node, raw: arg, value: arg};
+			const currentMatchNode = {node, raw: arg, value: arg, enums: []};
 
 			/** @type {MatchResult} */
 			const newMatch = {
@@ -247,6 +248,11 @@ class GraphGenerator {
 				// Parse value
 				if(isTypeMatch && segment.type) {
 					currentMatchNode.value = VariableSegment.parseValue(arg, segment);
+				}
+
+				// Add matching enums
+				if(matchingEnums.length) {
+					currentMatchNode.enums = matchingEnums;
 				}
 
 				if(isFull) {
@@ -388,7 +394,7 @@ class Command extends EventListener {
 		/**
 		 * @type {
 				EventListener["on"] &
-				((event: "preview", listener: (event: JLEvent & CommandResult & {preview: string | null}) => void) => JLListener)
+				((event: "preview", listener: (event: JLEvent & CommandResult & {autocompleteTarget: string | null, preview: string | null}) => void) => JLListener)
 			}
 		 */
 		// @ts-ignore
@@ -520,7 +526,7 @@ class VariableSegment extends CommandSegment {
 	/**
 	 * @typedef {Object} VariableSegmentOptions
 	 * @prop {string} name
-	 * @prop {string} [type]
+	 * @prop {"any" | "number" | "string" | "boolean" | "date" | "flag"} [type]
 	 * @prop {any} [default]
 	 * @prop {string[]} [enum]
 	 * @prop {() => string[]} [provider]
@@ -550,7 +556,7 @@ class VariableSegment extends CommandSegment {
 		/** @type {string} */
 		this.name = name;
 
-		/** @type {string | undefined} */
+		/** @type {VariableSegmentOptions["type"] | undefined} */
 		this.type = type;
 
 		/** @type {string | undefined} */

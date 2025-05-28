@@ -1,4 +1,4 @@
-// @ts-check
+//@ts-check
 
 const {EventListener, JLEvent, JLListener} = require("./JustLib.js");
 // const {EventListener} = require("../justlib/JustLib.js");
@@ -190,7 +190,8 @@ class CLI extends EventListener {
 		this.stdout.write(this.prompt);
 		this.resume();
 
-		let autocompleteRawText = "";
+		/** @type {{ target: string, raw: string, text: string} | null} */
+		let autocomplete = null;
 
 		// Add internal event handler for interactive hints and autocomplete
 		this.on("keypress", async e => {
@@ -239,23 +240,30 @@ class CLI extends EventListener {
 
 			// Reduce all possible combinations of matched segments to unique segments
 			for(const match of matches) {
-				const segment = match.nodes.at(-1)?.node.segment;
-				if(!segment) continue;
+				const node = match.nodes.at(-1);
+				if(!node) continue;
+
+				const segment = node.node.segment;
 
 				isInvokable ||= match.isInvokable;
 
 				if(segment instanceof KeywordSegment) {
 					keywords.add(segment.name);
 				} else if(segment instanceof VariableSegment) {
-					const values = variables.get(segment.name) || {types: new Set(), enums: new Set()};
+					const values = variables.get(segment.name) || {
+						types: new Set(),
+						enums: new Set(node.enums)
+					};
 
 					if(segment.type) {
 						values.types.add(segment.type);
-					} else if(segment.enum || segment._provided_enum) {
-						for(const value of segment.enum || segment._provided_enum || []) {
-							values.enums.add(value);
-						}
 					}
+
+					// if(segment.enum || segment._provided_enum) {
+					// 	for(const value of segment.enum || segment._provided_enum || []) {
+					// 		values.enums.add(value);
+					// 	}
+					// }
 
 					variables.set(segment.name, values);
 				}
@@ -273,7 +281,7 @@ class CLI extends EventListener {
 					const LParen = multTypes ? "§8(" : "";
 					const RParen = multTypes ? "§8)" : "";
 
-					return `§8${LParen}${[...typesStr, ...enumsStr].join("§8 | ")}${RParen} §3${name}`;
+					return `§8${LParen}${[...typesStr, ...enumsStr].slice(0, 10).join("§8 | ")}${RParen} §3${name}`;
 				});
 
 			const simplified = [...keywordsStr, ...variablesStr];
@@ -283,7 +291,7 @@ class CLI extends EventListener {
 			this.setHint(simplified.join("§8 | ") || "§4Error", false);
 
 			// Generate possible completions
-			const autocomplete = (function() {
+			autocomplete = (() => {
 				const match = matches
 					.sort((a, b) => {
 						const aSegment = a.nodes.at(-1)?.node.segment;
@@ -323,24 +331,27 @@ class CLI extends EventListener {
 
 				let text = segment.name;
 
+				// Pick an autocomplete value based on the segment type
 				if(isVariable) {
-					// Do not autocomplete some arbitrary value
-					if(segment.type) return null;
-
-					// No values to autocomplete
-					const _enum = segment.enum || segment._provided_enum || [];
-					if(!_enum) return null;
-
-					const value = _enum
-						// .sort((a, b) => a.length - b.length)
-						.find(e => e.startsWith(node.raw));
-					if(!value) return null;
-
-					text = value;
+					// Segment is a flag variable
+					if(segment.type === "flag") {
+						// Do not need to change anything, the text is already the flag name
+					}
+					// Segment is an enum variable
+					else if(node.enums.length !== 0) {
+						// TODO: add some strategy to select the most probable value (maybe based on history?)
+						text = node.enums/* .sort((a, b) => b.length - a.length) */[0];
+					}
 				}
 
 				// Format the completion
-				return `§8${text.slice(node.raw.length)}`;
+				const rawText = text.slice(node.raw.length);
+
+				return {
+					target: text,
+					raw: rawText,
+					text: `§8${rawText}`
+				};
 			})();
 
 			// Get the comment of the current segment(s)
@@ -356,8 +367,7 @@ class CLI extends EventListener {
 			})();
 
 			// Set the autocomplete to combination of possible completion and comment
-			this.setAutocomplete((autocomplete || "") + (comment || "") || null, false);
-			autocompleteRawText = autocomplete || "";
+			this.setAutocomplete((autocomplete?.text || "") + (comment || "") || null, false);
 
 			// Exit if the command is not invokable
 			if(!isInvokable) return;
@@ -376,6 +386,7 @@ class CLI extends EventListener {
 				parallel: true,
 				input: this.buffer,
 				argv: argv,
+				autocompleteTarget: autocomplete?.target || null,
 				preview: preview,
 				...result
 			}, e => {
@@ -388,16 +399,16 @@ class CLI extends EventListener {
 			if(!preview) return;
 
 			// Set the autocomplete to combination of possible completion and comment
-			this.setAutocomplete((autocomplete || "") + (preview || "") + (comment || "") || null);
+			this.setAutocomplete((autocomplete?.text || "") + (preview || "") + (comment || "") || null);
 		});
 
 		// Add internal event handler for submitting completion suggestions using tab key
 		this.on("keyinput", e => {
 			if(e.key !== "\t") return;
 
-			if(!autocompleteRawText) return e.stream.write("\x07"), e.preventDefault();
+			if(!autocomplete?.raw) return e.stream.write("\x07"), e.preventDefault();
 
-			e.key = autocompleteRawText.replace(/§[0-9a-fr]/g, "");
+			e.key = autocomplete.raw.replace(/§[0-9a-fr]/g, "");
 			this.setAutocomplete(null, false);
 		});
 
@@ -506,55 +517,55 @@ class CLI extends EventListener {
 		// Input
 		targetStream["__write"].apply(targetStream, [`\r\x1b[K${this.printCommand ? inputLine + "\r\n" : ""}${cli.prompt}`]);
 
-		// Events
-		if(this.awaitingInputsQueue.length === 0) {
-			// Try to handle the command from input
-			try {
-				const result = this.parseInput(input);
-				if(result) {
-					// Command was parsed successfully, emit command event and run the command handler
-					this.dispatchEvent("command", {...result}, e => {
-						result.command.callback(result);
-					});
-				}
-			} catch(error) {
-				// Failed to handle the command, emit an error event or throw an error
-				if(error instanceof CommandError && error.code === Command.ERROR.UNKNOWN_COMMAND) {
-					this.dispatchEvent("unknownCommand", {
-						error: error,
-						input: input
-					}, e => {
+		this.dispatchEvent("input", {input}, e => {
+			// Events
+			if(this.awaitingInputsQueue.length === 0) {
+				// Try to handle the command from input
+				try {
+					const result = this.parseInput(input);
+					if(result) {
+						// Command was parsed successfully, emit command event and run the command handler
+						this.dispatchEvent("command", {...result}, e => {
+							result.command.callback(result);
+						});
+					}
+				} catch(error) {
+					// Failed to handle the command, emit an error event or throw an error
+					if(error instanceof CommandError && error.code === Command.ERROR.UNKNOWN_COMMAND) {
+						this.dispatchEvent("unknownCommand", {
+							error: error,
+							input: input
+						}, e => {
+							throw error;
+						});
+
+						return;
+					}
+
+					this.dispatchEvent("error", {error}, e => {
 						throw error;
 					});
-
-					return;
 				}
+			} else if(this.awaitingInputsQueue[0].isActive) {
+				const awaitingInput = this.awaitingInputsQueue.shift();
+				if(!awaitingInput) return; // never
 
-				this.dispatchEvent("error", {error}, e => {
-					throw error;
-				});
+				// Resolve the input promise
+				awaitingInput.resolve(input);
+
+				// Restore the previous input buffer, prompt, hint and autocomplete
+				this.buffer = awaitingInput.cacheBuffer || "";
+				this.cursor = awaitingInput.cacheCursor || 0;
+				this.setHint(awaitingInput.cacheHint || null, false);
+				this.setAutocomplete(awaitingInput.cacheAutocomplete || null, false);
+				this.setPrompt(awaitingInput.cachePrompt || "", false);
+
+				// Render the prompt in the terminal, only if there are no more prompts awaiting (to prevent overdraw)
+				if(this.awaitingInputsQueue.length === 0) {
+					this._updateCLI();
+				}
 			}
-		} else if(this.awaitingInputsQueue[0].isActive) {
-			const awaitingInput = this.awaitingInputsQueue.shift();
-			if(!awaitingInput) return; // never
-
-			// Resolve the input promise
-			awaitingInput.resolve(input);
-
-			// Restore the previous input buffer, prompt, hint and autocomplete
-			this.buffer = awaitingInput.cacheBuffer || "";
-			this.cursor = awaitingInput.cacheCursor || 0;
-			this.setHint(awaitingInput.cacheHint || null, false);
-			this.setAutocomplete(awaitingInput.cacheAutocomplete || null, false);
-			this.setPrompt(awaitingInput.cachePrompt || "", false);
-
-			// Render the prompt in the terminal, only if there are no more prompts awaiting (to prevent overdraw)
-			if(this.awaitingInputsQueue.length === 0) {
-				this._updateCLI();
-			}
-		}
-
-		this.dispatchEvent("input", {input});
+		});
 
 		// In case there are more prompts awaiting, make the next one in the queue active
 		this._makeNextPromptActive();
@@ -620,33 +631,44 @@ class CLI extends EventListener {
 	parseArgv(input) {
 		if(!input) return [];
 
-		const argv = [];
+		// @ts-ignore
+		const argv = [...input.matchAll(/(?:(?<=^|\x20)(["'])((?:\\\1|.)*)\1(?=$|\x20)|[^\x20\n]+)/g)].map(e => e[2] ? e[2].replaceAll("\\" + e[1], "\"") : e[0]);
+		if(input.endsWith(" ")) argv.push("");
 
-		// Setup state variables
-		let buffer = "";
-		let quote = false;
-		let escape = false;
+		return argv;
 
-		// Tokenize the input
-		for(const char of input) {
-			if(char === " " && !quote) {
-				if(buffer) argv.push(buffer);
-				buffer = "";
-			} else if(char === "\"" && !escape) {
-				quote = !quote;
-			} else if(char === "\\" && !escape) {
-				escape = true;
-			} else {
-				buffer += char;
-				escape = false;
-			}
-		}
+		// const argv = [];
 
-		// Push the last buffer
-		argv.push(buffer);
+		// {
+		// 	// Setup state variables
+		// 	let buffer = "";
+		// 	let quote = false;
+		// 	let escape = false;
 
-		// Check for unmatched quote
-		if(quote) throw new CommandError("Unmatched quote", Command.ERROR.UNMATCHED_QUOTE);
+		// 	// Tokenize the input
+		// 	for(const char of input) {
+		// 		if(char === " " && !quote) {
+		// 			if(buffer) argv.push(buffer);
+		// 			buffer = "";
+		// 		} else if(char === "\"" && !escape) {
+		// 			quote = !quote;
+		// 		} else if(char === "\\" && !escape) {
+		// 			escape = true;
+		// 		} else {
+		// 			// The escaped character wasn't quote => preserve escape sequences
+		// 			if(escape) buffer += "\\";
+
+		// 			buffer += char;
+		// 			escape = false;
+		// 		}
+		// 	}
+
+		// 	// Push the last buffer
+		// 	argv.push(buffer);
+
+		// 	// Check for unmatched quote
+		// 	if(quote) throw new CommandError("Unmatched quote", Command.ERROR.UNMATCHED_QUOTE);
+		// }
 
 		// Return the parsed arguments
 		return argv;
@@ -797,9 +819,15 @@ class CLI extends EventListener {
 		const hint = this.hint ? `\n${ERASE_LINE}${this.formatter(this.hint)}${UP}` : this.hasHint && !(this.hasHint = false) ? `\n${ERASE_LINE}${UP}` : "";
 
 		const CLEAR_PROMPT_LINES = this.promptLines == 29 ? `${UP}${ERASE_LINE}\n${UP}\n${DOWN}` : "";
-		// `${UP}${START}${ERASE_LINE}`.repeat(this.promptLines - 1); // + `${DOWN}`;// .repeat(this.promptLines - 1);
+		//`${UP}${START}${ERASE_LINE}`.repeat(this.promptLines - 1); //+ `${DOWN}`;//.repeat(this.promptLines - 1);
 
-		const output = `${START}${ERASE_LINE}${CLEAR_PROMPT_LINES}${this.prompt}${this.buffer}${autocomplete}${START}${hint}${OFFSET_CURSOR}`;
+		const width = this.stdout.columns;
+
+		let inputLine = `${this.prompt}${this.buffer}${autocomplete}`;
+		const len = this._unescape(inputLine).length;
+		if(len > width) inputLine = `${inputLine.slice(0, width - 1)}>`;
+
+		const output = `${START}${ERASE_LINE}${CLEAR_PROMPT_LINES}${inputLine}${START}${hint}${OFFSET_CURSOR}`;
 
 		this.stdout["__write"].apply(this.stdout, [output]);
 	}
